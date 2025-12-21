@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: Docker is not installed or not on PATH. Install Docker Desktop and try again." >&2
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -z "$REPO_ROOT" ]; then
+  echo "Error: run must be executed inside the CS_147_Handouts git repository." >&2
+  exit 1
+fi
+
+case "$PWD/" in
+  "$REPO_ROOT/"*) ;;
+  *)
+    echo "Error: current directory ($PWD) is not inside the repository root ($REPO_ROOT)." >&2
+    exit 1
+    ;;
+esac
+
+REL_PATH="${PWD#"$REPO_ROOT"}"
+REL_PATH="${REL_PATH#/}"
+WORKDIR="/repo"
+[ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
+
+if [ "${1:-}" = "setup" ]; then
+  echo "Building Docker image '$IMAGE_NAME'..."
+  docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+  echo "Docker image '$IMAGE_NAME' is ready."
+  exit 0
+fi
+
+if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+  echo "Error: Docker image '$IMAGE_NAME' not found. Run './run setup' first." >&2
+  exit 1
+fi
+
+TTY_FLAGS=()
+if [ -t 0 ] && [ -t 1 ]; then
+  TTY_FLAGS=(-it)
+fi
+
+if [ $# -eq 0 ]; then
+  set -- shell
+fi
+
+if [ "$1" = "shell" ]; then
+  shift
+  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
+fi
+
+exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" -w "$WORKDIR" "$IMAGE_NAME" "$@"
