@@ -6,7 +6,8 @@ RUN apt-get update && \
     make \
     git \
     bash \
-    ca-certificates && \
+    ca-certificates \
+    zip && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
