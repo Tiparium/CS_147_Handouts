@@ -4,10 +4,10 @@ CONFIG_FILE := $(REPO_ROOT)/config.json
 CONFIG_SCRIPT := $(REPO_ROOT)/student_config.py
 ASSIGNMENTS_ROOT := $(REPO_ROOT)/assignments
 TURNINS_ROOT := $(REPO_ROOT)/generated_turnins
-ASSIGNMENT_DIR := $(ASSIGNMENTS_ROOT)/$(ASSIGNMENT_NAME)
-SUBMISSION_DIR := $(TURNINS_ROOT)/$(ASSIGNMENT_NAME)
+ASSIGNMENT_DIR ?= $(ASSIGNMENTS_ROOT)/$(ASSIGNMENT_NAME)
+SUBMISSION_DIR ?= $(TURNINS_ROOT)/$(ASSIGNMENT_NAME)
 
-STUDENT_NAME_FROM_CONFIG := $(shell if command -v python3 >/dev/null 2>&1; then python3 "$(CONFIG_SCRIPT)" current --config "$(CONFIG_FILE)" 2>/dev/null; fi)
+STUDENT_NAME_FROM_CONFIG := $(shell if command -v python3 >/dev/null 2>&1; then python3 "$(CONFIG_SCRIPT)" --config "$(CONFIG_FILE)" current 2>/dev/null; fi)
 
 ifeq ($(strip $(STUDENT_NAME_FROM_CONFIG)),)
   ifeq ($(strip $(STUDENT)),)
@@ -24,6 +24,7 @@ endif
 SUBMISSION_BASENAME := $(ASSIGNMENT_NAME)_$(STUDENT_NAME)_submission
 
 .PHONY: submit
+ifndef CUSTOM_SUBMIT
 submit:
 	@echo "[Assignemnt] Make Submit behavior has not yet been implemented."
 	@mkdir -p "$(SUBMISSION_DIR)"
@@ -31,3 +32,4 @@ submit:
 	  name="$(SUBMISSION_BASENAME)$${i}.zip"; \
 	  echo "Creating submission archive: $${name}"; \
 	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$(SUBMISSION_DIR)/$${name}" .)
+endif

@@ -5,8 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
-CONFIG_FILE="$REPO_ROOT/config.json"
-CONFIG_SCRIPT="$REPO_ROOT/student_config.py"
+CONFIG_FILE_HOST="$REPO_ROOT/config.json"
+CONFIG_SCRIPT_HOST="$REPO_ROOT/student_config.py"
+CONFIG_FILE_CONT="/repo/config.json"
+CONFIG_SCRIPT_CONT="/repo/student_config.py"
+TEST_FORCE=""
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: Docker is not installed or not on PATH. Install Docker Desktop and try again." >&2
@@ -51,7 +54,7 @@ fi
 
 ensure_student_name() {
   # Uses container python, so call after image exists.
-  current_name="$(docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT" current --config /repo/config.json 2>/dev/null || true)"
+  current_name="$(docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" current 2>/dev/null || true)"
   if [ -n "$current_name" ]; then
     echo "Student name: $current_name"
     return
@@ -62,16 +65,40 @@ ensure_student_name() {
     echo "Name cannot be empty." >&2
     exit 1
   fi
-  docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT" set --config /repo/config.json --name "$new_name"
+  docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" set --name "$new_name"
   echo "Recorded student name: $new_name"
 }
 
 if [ "${1:-}" = "setup" ]; then
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --test-force=*)
+        TEST_FORCE="${1#*=}"
+        ;;
+      *)
+        echo "Unknown setup option: $1" >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
   echo "Building Docker image '$IMAGE_NAME'..."
   docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
   echo "Docker image '$IMAGE_NAME' is ready."
   ensure_student_name
-  exit 0
+  echo "Running self-test (.testing)..."
+  attempt=1
+  while [ $attempt -le 3 ]; do
+    echo "Self-test attempt $attempt/3..."
+    if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"}; then
+      echo "Self-test passed."
+      exit 0
+    fi
+    attempt=$((attempt+1))
+  done
+  echo "Self-test failed after 3 attempts. Please contact the instructor."
+  exit 1
 fi
 
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
