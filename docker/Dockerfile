@@ -8,9 +8,12 @@ RUN apt-get update && \
     bash \
     ca-certificates \
     zip \
+    unzip \
     python3 \
     python3-pip \
-    python3-diff-match-patch && \
+    python3-diff-match-patch \
+    tree \
+    vim && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
