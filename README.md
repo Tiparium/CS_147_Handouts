@@ -28,6 +28,7 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - Assignments live in `assignments/hw01` … `hw06`, `lab`, and `project`.
 - From repo root: `./run make submit hw01` (or `hw02`, `lab`, `project`, etc.).
 - Each assignment has its own `make submit` that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
+- `make submit` requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run make student_name` to set it.
 
 ## Notes
 - Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.
