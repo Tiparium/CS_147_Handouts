@@ -11,7 +11,7 @@ This repo holds CS 147 handouts and homework. Tooling runs inside Docker so stud
 cd CS_147_Handouts
 ./run setup
 ```
-This builds the `cs147-verilog-toolchain` image (or use `DOCKER_IMAGE_NAME` to override).
+You’ll be prompted for your name (used in submission zips). This builds the `cs147-verilog-toolchain` image (or use `DOCKER_IMAGE_NAME` to override).
 
 ## Daily usage
 - Run any command through the wrapper from anywhere in the repo:
@@ -30,5 +30,7 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - Each assignment has its own `make submit` that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
 
 ## Notes
+- Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.
+- To rebuild from scratch on your machine: run `make clean_docker` (on the host, not via `./run`) to remove the local image; it can optionally clear your name from `config.json`.
 - The Docker image only contains the toolchain (Icarus Verilog, make, git, bash, ca-certificates); assignments stay in your working copy.
 - If you see “image not found,” run `./run setup` to (re)build locally.

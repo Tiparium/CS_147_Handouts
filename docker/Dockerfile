@@ -7,7 +7,10 @@ RUN apt-get update && \
     git \
     bash \
     ca-certificates \
-    zip && \
+    zip \
+    python3 \
+    python3-pip \
+    python3-diff-match-patch && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
