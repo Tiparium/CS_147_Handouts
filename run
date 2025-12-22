@@ -2,15 +2,16 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
+CONFIG_FILE="$REPO_ROOT/config.json"
+CONFIG_SCRIPT="$REPO_ROOT/student_config.py"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: Docker is not installed or not on PATH. Install Docker Desktop and try again." >&2
   exit 1
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 
 if [ -z "$REPO_ROOT" ]; then
   echo "Error: run must be executed inside the CS_147_Handouts git repository." >&2
@@ -30,10 +31,46 @@ REL_PATH="${REL_PATH#/}"
 WORKDIR="/repo"
 [ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
 
+print_help() {
+  cat <<'EOF'
+./run commands:
+  ./run setup                  Build the Docker image (uses DOCKER_IMAGE_NAME override if set), then prompt for your name.
+  ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
+  ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
+  ./run help                   Show this help plus top-level make targets.
+EOF
+}
+
+if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "--help-only" ]; then
+  print_help
+  if [ "${1:-}" != "--help-only" ] && [ -z "${RUN_HELP_SKIP_MAKE:-}" ]; then
+    RUN_HELP_SKIP_RUN=1 make -s -C "$REPO_ROOT" help
+  fi
+  exit 0
+fi
+
+ensure_student_name() {
+  # Uses container python, so call after image exists.
+  current_name="$(docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT" current --config /repo/config.json 2>/dev/null || true)"
+  if [ -n "$current_name" ]; then
+    echo "Student name: $current_name"
+    return
+  fi
+  printf "Enter your name (for submissions): "
+  read -r new_name
+  if [ -z "$new_name" ]; then
+    echo "Name cannot be empty." >&2
+    exit 1
+  fi
+  docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT" set --config /repo/config.json --name "$new_name"
+  echo "Recorded student name: $new_name"
+}
+
 if [ "${1:-}" = "setup" ]; then
   echo "Building Docker image '$IMAGE_NAME'..."
   docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
   echo "Docker image '$IMAGE_NAME' is ready."
+  ensure_student_name
   exit 0
 fi
 
