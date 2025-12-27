@@ -87,17 +87,23 @@ if [ "${1:-}" = "setup" ]; then
   docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
   echo "Docker image '$IMAGE_NAME' is ready."
   ensure_student_name
-  echo "Running self-test (.testing)..."
+  echo "------------------------------------------------------------"
+  echo "[SELF-TEST] .testing"
+  echo "============================================================"
   attempt=1
   while [ $attempt -le 3 ]; do
     echo "Self-test attempt $attempt/3..."
     if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"}; then
-      echo "Self-test passed."
+      echo "============================================================"
+      echo "[SELF-TEST] PASS"
+      echo "------------------------------------------------------------"
       exit 0
     fi
     attempt=$((attempt+1))
   done
-  echo "Self-test failed after 3 attempts. Please contact the instructor."
+  echo "============================================================"
+  echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
+  echo "------------------------------------------------------------"
   exit 1
 fi
 
