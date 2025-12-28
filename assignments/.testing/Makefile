@@ -17,6 +17,29 @@ submit:
 	rm -f "$$submission_zip"; \
 	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
 	tmpdir=$$(mktemp -d); \
+	run_with_spinner() { \
+	  label="$$1"; shift; \
+	  start_ts=$$(date +%s); \
+	  i=0; \
+	  "$$@" & \
+	  cmd_pid=$$!; \
+	  while kill -0 "$$cmd_pid" 2>/dev/null; do \
+	    elapsed=$$(( $$(date +%s) - start_ts )); \
+	    mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
+	    case $$i in \
+	      0) spin_char='|' ;; \
+	      1) spin_char='/' ;; \
+	      2) spin_char='-' ;; \
+	      3) spin_char='\\' ;; \
+	    esac; \
+	    printf "\r  [INFO] %s: %s %02d:%02d" "$$label" "$$spin_char" "$$mins" "$$secs"; \
+	    i=$$(( (i + 1) % 4 )); \
+	    sleep 0.2; \
+	  done; \
+	  wait "$$cmd_pid"; rc=$$?; \
+	  printf "\r"; \
+	  return $$rc; \
+	}; \
 	section() { \
 	  name="$$1"; status_var="$$2"; shift 2; \
 	  eval "$$status_var=pass"; \
@@ -54,21 +77,25 @@ submit:
 	    primary_status="fail"; \
 	  else \
 	    autolog=$$(mktemp); \
-	    if (cd "$(AUTOGRADER_DIR)" && ./run setup >"$$autolog" 2>&1); then \
+	    if run_with_spinner "Autograder setup" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run setup >\"$$autolog\" 2>&1"; then \
 	      reuse_note=""; \
 	      if grep -qi "already exists; reusing" "$$autolog"; then \
 	        reuse_note=" (Reusing existing Docker container)"; \
 	      fi; \
+	      printf "\r"; \
 	      echo "  [OK] Autograder setup$$reuse_note"; \
 	    else \
+	      printf "\r"; \
 	      echo "  [FAIL] Autograder setup"; \
 	      sed 's/^/    /' "$$autolog"; \
 	      primary_status="fail"; \
 	    fi; \
 	    if [ "$$primary_status" = "pass" ]; then \
-	      if (cd "$(AUTOGRADER_DIR)" && ./run grade "./test_submissions/submission_test.zip" >>"$$autolog" 2>&1); then \
+	      if run_with_spinner "Autograder grade" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run grade \"./test_submissions/submission_test.zip\" >>\"$$autolog\" 2>&1"; then \
+	        printf "\r"; \
 	        echo "  [OK] Autograder grade"; \
 	      else \
+	        printf "\r"; \
 	        echo "  [FAIL] Autograder grade"; \
 	        sed 's/^/    /' "$$autolog"; \
 	        primary_status="fail"; \
