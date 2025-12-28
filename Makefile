@@ -2,6 +2,7 @@ PUBLIC_ASSIGNMENTS := hw01 hw02 hw03 hw04 hw05 hw06 lab project
 ASSIGNMENTS := $(PUBLIC_ASSIGNMENTS) .testing
 ASSIGNMENT := $(firstword $(filter-out submit,$(MAKECMDGOALS)))
 DOCKER_IMAGE_NAME ?= cs147-verilog-toolchain
+AUTOGRADER_IMAGE_NAME ?= gradescope/autograder-base
 CONFIG_FILE := $(CURDIR)/config.json
 CONFIG_SCRIPT := $(CURDIR)/student_config.py
 
@@ -24,7 +25,7 @@ help -h:
 	@echo "  make submit <assignment>  - run submission for $(PUBLIC_ASSIGNMENTS)"
 	@echo "  make student_name         - show/update student name in config.json"
 	@echo "  make clean_turnins        - delete generated submission archives (prompts)"
-	@echo "  make clean_docker         - remove local Docker image (prompts; optional config cleanup)"
+	@echo "  make clean_docker         - remove local Docker images (toolchain + autograder base) (prompts; optional config cleanup)"
 	@echo "  make clean                - run all clean_* targets and remove local self-test logs"
 	@echo "  make -h / make help       - show this help"
 	@if [ -z "$$RUN_HELP_SKIP_RUN" ]; then \
@@ -43,14 +44,16 @@ clean_docker:
 		echo "Error: docker not found. Run this on the host (not inside ./run)."; \
 		exit 1; \
 	fi
-	@echo -n "This will remove the Docker image '$(DOCKER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
+	@echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
 	  case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
-	  if docker image inspect "$(DOCKER_IMAGE_NAME)" >/dev/null 2>&1; then \
-	    docker rmi -f "$(DOCKER_IMAGE_NAME)" >/dev/null && echo "Removed image $(DOCKER_IMAGE_NAME)."; \
-	  else \
-	    echo "Image $(DOCKER_IMAGE_NAME) not found."; \
-	  fi; \
+	  for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
+	    if docker image inspect "$$img" >/dev/null 2>&1; then \
+	      docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
+	    else \
+	      echo "Image $$img not found."; \
+	    fi; \
+	  done; \
 	  echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
 		  read ans2 ; \
 		  case $$ans2 in \
