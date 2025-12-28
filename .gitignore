@@ -5,6 +5,10 @@
 cs147-verilog-toolchain.tar
 cs147-verilog-toolchain.img
 
+# Global log ignores (keep directories, ignore log files)
+*.log
+**/*.log
+
 # Local student config
 config.json
 
@@ -12,8 +16,9 @@ config.json
 .context/
 
 # Hidden testing errors
-assignments/.testing/errors/
-assignments/.testing/Gradescope_Autograder_Template/failed tests/
+assignments/.testing/errors/*
+assignments/.testing/Gradescope_Autograder_Template/failed tests/*
+assignments/.testing/Gradescope_Autograder_Template/local_results/*
 
 # Local self-test logs
 .testing_selftest_attempt*.log
