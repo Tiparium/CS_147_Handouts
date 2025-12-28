@@ -39,9 +39,11 @@ submit:
 	}; \
 	run_mux "Continuous mux" "tb_mux2_continuous.v" "mux2_continuous.v"; \
 	run_mux "Procedural mux" "tb_mux2_procedural.v" "mux2_procedural.v"; \
-	autolog=$$(mktemp); \
-	grade_tmp=$$(mktemp -d); \
-	if command -v docker >/dev/null 2>&1; then \
+	if ! command -v docker >/dev/null 2>&1; then \
+	  echo "  [FAIL] Autograder setup (docker not available in PATH)"; \
+	  primary_status="fail"; \
+	else \
+	  autolog=$$(mktemp); \
 	  if (cd "$(AUTOGRADER_DIR)" && ./run setup >"$$autolog" 2>&1); then \
 	    echo "  [OK] Autograder setup"; \
 	  else \
@@ -60,19 +62,8 @@ submit:
 	  else \
 	    echo "  [SKIP] Autograder grade (setup failed)"; \
 	  fi; \
-	else \
-	  echo "  [INFO] Docker not available; running grade.py directly (no container)."; \
-	  unzip -q "$$submission_zip" -d "$$grade_tmp/submission"; \
-	  if (cd "$$grade_tmp/submission" && python3 -u "$(AUTOGRADER_DIR)/grade.py" >"$$autolog" 2>&1); then \
-	    echo "  [OK] Autograder grade (no docker)"; \
-	  else \
-	    echo "  [FAIL] Autograder grade (no docker)"; \
-	    sed 's/^/    /' "$$autolog"; \
-	    primary_status="fail"; \
-	  fi; \
+	  rm -f "$$autolog"; \
 	fi; \
-	rm -f "$$autolog"; \
-	rm -rf "$$grade_tmp"; \
 	echo ""; \
 	echo "[TEST] Secondary Dependencies"; \
 	secondary_status=pass; \

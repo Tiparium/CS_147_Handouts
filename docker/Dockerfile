@@ -13,7 +13,8 @@ RUN apt-get update && \
     python3-pip \
     python3-diff-match-patch \
     tree \
-    vim && \
+    vim \
+    docker.io && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo

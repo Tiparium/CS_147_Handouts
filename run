@@ -11,6 +11,12 @@ CONFIG_FILE_CONT="/repo/config.json"
 CONFIG_SCRIPT_CONT="/repo/student_config.py"
 TEST_FORCE=""
 
+# Normalize paths on MSYS/Git Bash (Windows)
+if command -v cygpath >/dev/null 2>&1; then
+  SCRIPT_DIR="$(cygpath -u "$SCRIPT_DIR")"
+  REPO_ROOT="$(cygpath -u "$REPO_ROOT")"
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: Docker is not installed or not on PATH. Install Docker Desktop and try again." >&2
   exit 1
@@ -33,6 +39,11 @@ REL_PATH="${PWD#"$REPO_ROOT"}"
 REL_PATH="${REL_PATH#/}"
 WORKDIR="/repo"
 [ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
+
+DOCKER_SOCK_VOLUME=()
+if [ -S /var/run/docker.sock ]; then
+  DOCKER_SOCK_VOLUME=(-v /var/run/docker.sock:/var/run/docker.sock)
+fi
 
 print_help() {
   cat <<'EOF'
@@ -90,35 +101,33 @@ if [ "${1:-}" = "setup" ]; then
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"
   echo "============================================================"
-attempt=1
-while [ $attempt -le 3 ]; do
-  echo "---------------- attempt $attempt/3 ----------------"
-  if [ $attempt -lt 3 ]; then
+  attempt=1
+  set +e  # allow retries even when commands fail inside the loop
+  while [ $attempt -le 3 ]; do
+    echo "---------------- attempt $attempt/3 ----------------"
     log_file="$REPO_ROOT/.testing_selftest_attempt${attempt}.log"
-    if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"} >"$log_file" 2>&1; then
+    if docker run --rm -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"} >"$log_file" 2>&1; then
+      cat "$log_file"
       echo "============================================================"
       echo "[SELF-TEST] PASS"
       echo "------------------------------------------------------------"
       exit 0
     else
-      echo "(attempt $attempt failed; output saved to $log_file)"
+      if [ $attempt -lt 3 ]; then
+        echo "(attempt $attempt failed; output saved to $log_file)"
+      else
+        cat "$log_file"
+      fi
     fi
-  else
-    if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"}; then
-      echo "============================================================"
-      echo "[SELF-TEST] PASS"
-      echo "------------------------------------------------------------"
-      exit 0
-    fi
-  fi
-  echo "---------------- end attempt $attempt ----------------"
-  attempt=$((attempt+1))
-done
-echo "============================================================"
-echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
-if ls "$REPO_ROOT"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
-  echo "Saved logs:"
-  ls -1 "$REPO_ROOT"/.testing_selftest_attempt*.log
+    echo "---------------- end attempt $attempt ----------------"
+    attempt=$((attempt+1))
+  done
+  set -e
+  echo "============================================================"
+  echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
+  if ls "$REPO_ROOT"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
+    echo "Saved logs:"
+    ls -1 "$REPO_ROOT"/.testing_selftest_attempt*.log
 fi
 echo "------------------------------------------------------------"
 exit 1
@@ -140,7 +149,7 @@ fi
 
 if [ "$1" = "shell" ]; then
   shift
-  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
+  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
 fi
 
-exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" -w "$WORKDIR" "$IMAGE_NAME" "$@"
+exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" "$@"
