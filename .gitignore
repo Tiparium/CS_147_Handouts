@@ -13,10 +13,11 @@ config.json
 
 # Hidden testing errors
 assignments/.testing/errors/
+assignments/.testing/Gradescope_Autograder_Template/failed tests/
 
 # Local self-test logs
 .testing_selftest_attempt*.log
-.testing/Gradescope_Autograder_Template/.git/
+assignments/.testing/Gradescope_Autograder_Template/.git/
 
 # Generated submissions (keep directory structure and submissions.txt)
 generated_turnins/**
