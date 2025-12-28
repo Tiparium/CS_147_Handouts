@@ -5,6 +5,7 @@ include ../assignment-common.mk
 ASSIGNMENT_DIR := $(ASSIGNMENTS_ROOT)/.testing
 SUBMISSION_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions
 ERRORS_DIR := $(ASSIGNMENT_DIR)/errors
+AUTOGRADER_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template
 
 .PHONY: submit
 submit:
@@ -14,6 +15,7 @@ submit:
 	submission_zip="$(SUBMISSION_DIR)/submission_test.zip"; \
 	failed_dir="$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/failed tests"; \
 	rm -f "$$submission_zip"; \
+	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
 	echo "[TEST] Primary Dependency: iVerilog"; \
 	tmpdir=$$(mktemp -d); \
 	primary_status="pass"; \
@@ -37,8 +39,40 @@ submit:
 	}; \
 	run_mux "Continuous mux" "tb_mux2_continuous.v" "mux2_continuous.v"; \
 	run_mux "Procedural mux" "tb_mux2_procedural.v" "mux2_procedural.v"; \
-	echo "  [FAIL] Autograder integration not yet implemented."; \
-	primary_status="fail"; \
+	autolog=$$(mktemp); \
+	grade_tmp=$$(mktemp -d); \
+	if command -v docker >/dev/null 2>&1; then \
+	  if (cd "$(AUTOGRADER_DIR)" && ./run setup >"$$autolog" 2>&1); then \
+	    echo "  [OK] Autograder setup"; \
+	  else \
+	    echo "  [FAIL] Autograder setup"; \
+	    sed 's/^/    /' "$$autolog"; \
+	    primary_status="fail"; \
+	  fi; \
+	  if [ "$$primary_status" = "pass" ]; then \
+	    if (cd "$(AUTOGRADER_DIR)" && ./run grade "./test_submissions/submission_test.zip" >>"$$autolog" 2>&1); then \
+	      echo "  [OK] Autograder grade"; \
+	    else \
+	      echo "  [FAIL] Autograder grade"; \
+	      sed 's/^/    /' "$$autolog"; \
+	      primary_status="fail"; \
+	    fi; \
+	  else \
+	    echo "  [SKIP] Autograder grade (setup failed)"; \
+	  fi; \
+	else \
+	  echo "  [INFO] Docker not available; running grade.py directly (no container)."; \
+	  unzip -q "$$submission_zip" -d "$$grade_tmp/submission"; \
+	  if (cd "$$grade_tmp/submission" && python3 -u "$(AUTOGRADER_DIR)/grade.py" >"$$autolog" 2>&1); then \
+	    echo "  [OK] Autograder grade (no docker)"; \
+	  else \
+	    echo "  [FAIL] Autograder grade (no docker)"; \
+	    sed 's/^/    /' "$$autolog"; \
+	    primary_status="fail"; \
+	  fi; \
+	fi; \
+	rm -f "$$autolog"; \
+	rm -rf "$$grade_tmp"; \
 	echo ""; \
 	echo "[TEST] Secondary Dependencies"; \
 	secondary_status=pass; \
@@ -59,7 +93,6 @@ submit:
 	secondary_status_upper=$$(printf '%s' "$$secondary_status" | tr '[:lower:]' '[:upper:]'); \
 	echo "  [Result: $$secondary_status_upper]"; \
 	echo ""; \
-	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
 	rm -rf "$$tmpdir"; \
 	if [ "$$primary_status" = "pass" ]; then \
 	  rm -f "$$submission_zip"; \

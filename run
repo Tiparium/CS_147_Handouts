@@ -114,10 +114,14 @@ while [ $attempt -le 3 ]; do
   echo "---------------- end attempt $attempt ----------------"
   attempt=$((attempt+1))
 done
-  echo "============================================================"
-  echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
-  echo "------------------------------------------------------------"
-  exit 1
+echo "============================================================"
+echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
+if ls "$REPO_ROOT"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
+  echo "Saved logs:"
+  ls -1 "$REPO_ROOT"/.testing_selftest_attempt*.log
+fi
+echo "------------------------------------------------------------"
+exit 1
 fi
 
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
