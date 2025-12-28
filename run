@@ -90,17 +90,30 @@ if [ "${1:-}" = "setup" ]; then
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"
   echo "============================================================"
-  attempt=1
-  while [ $attempt -le 3 ]; do
-    echo "Self-test attempt $attempt/3..."
+attempt=1
+while [ $attempt -le 3 ]; do
+  echo "---------------- attempt $attempt/3 ----------------"
+  if [ $attempt -lt 3 ]; then
+    log_file="$REPO_ROOT/.testing_selftest_attempt${attempt}.log"
+    if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"} >"$log_file" 2>&1; then
+      echo "============================================================"
+      echo "[SELF-TEST] PASS"
+      echo "------------------------------------------------------------"
+      exit 0
+    else
+      echo "(attempt $attempt failed; output saved to $log_file)"
+    fi
+  else
     if docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" make submit .testing ${TEST_FORCE:+FORCE_RESULT="$TEST_FORCE"}; then
       echo "============================================================"
       echo "[SELF-TEST] PASS"
       echo "------------------------------------------------------------"
       exit 0
     fi
-    attempt=$((attempt+1))
-  done
+  fi
+  echo "---------------- end attempt $attempt ----------------"
+  attempt=$((attempt+1))
+done
   echo "============================================================"
   echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
   echo "------------------------------------------------------------"
