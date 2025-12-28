@@ -3,20 +3,42 @@ CUSTOM_SUBMIT := 1
 include ../assignment-common.mk
 # Override paths after common vars are defined
 ASSIGNMENT_DIR := $(ASSIGNMENTS_ROOT)/.testing
-SUBMISSION_DIR := $(TURNINS_ROOT)/.testing
+SUBMISSION_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions
 ERRORS_DIR := $(ASSIGNMENT_DIR)/errors
 
 .PHONY: submit
 submit:
-	@set -e; \
+	@set +e; \
 	mkdir -p "$(SUBMISSION_DIR)"; \
 	ts=$$(date +"%Y%m%d-%H%M%S"); \
-	i=1; while [ -e "$(SUBMISSION_DIR)/$(SUBMISSION_BASENAME)$${i}.zip" ]; do i=$$((i+1)); done; \
-	zip_path="$(SUBMISSION_DIR)/$(SUBMISSION_BASENAME)$${i}.zip"; \
-	tmpdir=$$(mktemp -d); \
+	submission_zip="$(SUBMISSION_DIR)/submission_test.zip"; \
+	failed_dir="$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/failed tests"; \
+	rm -f "$$submission_zip"; \
 	echo "[TEST] Primary Dependency: iVerilog"; \
-	echo "  [INFO] TODO: add functional test here."; \
-	echo "  [Result: PASS (placeholder)]"; \
+	tmpdir=$$(mktemp -d); \
+	primary_status="pass"; \
+	run_mux() { \
+	  name="$$1"; tb="$$2"; src="$$3"; \
+	  sanitized_name=$$(printf '%s' "$$name" | tr ' ' '_'); \
+	  out="$$tmpdir/$$sanitized_name.out"; \
+	  if iverilog -g2012 -o "$$out" "$(ASSIGNMENT_DIR)/$$src" "$(ASSIGNMENT_DIR)/$$tb"; then \
+	    sim_out=$$(vvp "$$out" 2>&1); \
+	    sim_rc=$$?; \
+	    if [ $$sim_rc -eq 0 ]; then \
+	      echo "  [OK] $$name"; \
+	    else \
+	      echo "  [FAIL] $$name (simulation)"; \
+	      printf "%s\n" "$$sim_out" | sed 's/^/    /'; \
+	      primary_status="fail"; \
+	    fi; \
+	  else \
+	    echo "  [FAIL] $$name (compile)"; primary_status="fail"; \
+	  fi; \
+	}; \
+	run_mux "Continuous mux" "tb_mux2_continuous.v" "mux2_continuous.v"; \
+	run_mux "Procedural mux" "tb_mux2_procedural.v" "mux2_procedural.v"; \
+	echo "  [FAIL] Autograder integration not yet implemented."; \
+	primary_status="fail"; \
 	echo ""; \
 	echo "[TEST] Secondary Dependencies"; \
 	secondary_status=pass; \
@@ -37,40 +59,13 @@ submit:
 	secondary_status_upper=$$(printf '%s' "$$secondary_status" | tr '[:lower:]' '[:upper:]'); \
 	echo "  [Result: $$secondary_status_upper]"; \
 	echo ""; \
-	echo "[TEST] Compression / Decompression"; \
-	echo "Creating submission archive: $$(basename "$$zip_path")"; \
-	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$zip_path" . -x "errors" "errors/*"); \
-	mkdir -p "$$tmpdir/unzipped"; \
-	unzip -q "$$zip_path" -d "$$tmpdir/unzipped"; \
-	result="pass"; \
-	force_result=""; \
-	case "$(FORCE_RESULT)" in pass|PASS|p|-p) force_result="pass" ;; fail|FAIL|f|-f) force_result="fail" ;; esac; \
-	if [ -n "$$force_result" ]; then \
-	  echo "  FORCED RESULT: $$force_result"; \
-	  result="$$force_result"; \
-	elif ! diff -qr "$(ASSIGNMENT_DIR)" "$$tmpdir/unzipped" -x errors >/dev/null; then \
-	  result="fail"; \
-	fi; \
-	if [ "$$result" = "pass" ]; then \
-	  echo "  [Result: PASS]"; \
-	  echo ""; \
-	  rm -rf "$$zip_path" "$$tmpdir"; \
+	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
+	rm -rf "$$tmpdir"; \
+	if [ "$$primary_status" = "pass" ]; then \
+	  rm -f "$$submission_zip"; \
 	else \
-	  echo "  [Result: FAIL]"; \
-	  if [ "$$force_result" = "fail" ]; then \
-	    echo "Forced fail requested; skipping error capture."; \
-	    rm -rf "$$zip_path" "$$tmpdir"; \
-	    exit 1; \
-	  fi; \
-	  err_dir="$(ERRORS_DIR)/$$ts"; \
-   	  mkdir -p "$$err_dir/original"; \
-	  mv "$$zip_path" "$$err_dir/"; \
-	  mv "$$tmpdir/unzipped" "$$err_dir/unzipped"; \
-	  find "$(ASSIGNMENT_DIR)" -mindepth 1 -maxdepth 1 ! -name errors -exec mv {} "$$err_dir/original/" \; ; \
-	  printf "timestamp: %s\nresult: FAIL\nzip: %s\n" "$$ts" "$$(basename "$$zip_path")" > "$$err_dir/.meta"; \
-	  rm -rf "$$tmpdir"; \
-	  echo "Artifacts saved to $$err_dir"; \
-	  echo ""; \
-	  exit 1; \
+	  mkdir -p "$$failed_dir"; \
+	  mv -f "$$submission_zip" "$$failed_dir/" 2>/dev/null || true; \
 	fi; \
-	if [ "$$secondary_status" != "pass" ]; then exit 1; fi
+	if [ "$$secondary_status" != "pass" ]; then exit 1; fi; \
+	if [ "$$primary_status" != "pass" ]; then exit 1; fi
