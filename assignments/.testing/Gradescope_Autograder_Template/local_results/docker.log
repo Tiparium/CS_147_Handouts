@@ -1,0 +1,7 @@
+[container] WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+[container] docker: Error response from daemon: mounts denied: 
+[container] The path /repo/assignments/.testing/Gradescope_Autograder_Template is not shared from the host and is not known to Docker.
+[container] You can configure shared paths from Docker -> Preferences... -> Resources -> File Sharing.
+[container] See https://docs.docker.com/go/mac-file-sharing/ for more info.
+[container] 
+[container] Run 'docker run --help' for more information
