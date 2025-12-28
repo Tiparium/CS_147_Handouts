@@ -5,7 +5,7 @@ DOCKER_IMAGE_NAME ?= cs147-verilog-toolchain
 CONFIG_FILE := $(CURDIR)/config.json
 CONFIG_SCRIPT := $(CURDIR)/student_config.py
 
-.PHONY: submit clean_turnins clean_docker student_name help -h $(ASSIGNMENTS)
+.PHONY: submit clean_turnins clean_docker clean student_name help -h $(ASSIGNMENTS)
 
 submit:
 	@if [ -z "$(ASSIGNMENT)" ]; then \
@@ -25,6 +25,7 @@ help -h:
 	@echo "  make student_name         - show/update student name in config.json"
 	@echo "  make clean_turnins        - delete generated submission archives (prompts)"
 	@echo "  make clean_docker         - remove local Docker image (prompts; optional config cleanup)"
+	@echo "  make clean                - run all clean_* targets and remove local self-test logs"
 	@echo "  make -h / make help       - show this help"
 	@if [ -z "$$RUN_HELP_SKIP_RUN" ]; then \
 		RUN_HELP_SKIP_MAKE=1 ./run --help-only; \
@@ -58,8 +59,13 @@ clean_docker:
 		          else \
 		            echo "python3 not found; skipping personal info cleanup."; \
 		          fi ;; \
-		    *) echo "Personal info preserved."; ;; \
-		  esac
+			    *) echo "Personal info preserved."; ;; \
+			  esac
+
+clean: clean_turnins
+	@$(MAKE) clean_docker
+	@rm -f .testing_selftest_attempt*.log
+	@echo "Cleaned turn-ins, docker image (if confirmed), and local self-test logs."
 
 student_name:
 	@./run python3 student_config.py --config /repo/config.json summary

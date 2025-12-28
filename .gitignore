@@ -1,0 +1,23 @@
+# macOS cruft
+.DS_Store
+
+# Local docker image exports (e.g., from `docker save`)
+cs147-verilog-toolchain.tar
+cs147-verilog-toolchain.img
+
+# Local student config
+config.json
+
+# Local, untracked context files
+.context/
+
+# Hidden testing errors
+assignments/.testing/errors/
+
+# Local self-test logs
+.testing_selftest_attempt*.log
+
+# Generated submissions (keep directory structure and submissions.txt)
+generated_turnins/**
+!generated_turnins/submissions.txt
+!generated_turnins/**/.gitkeep
