@@ -55,7 +55,11 @@ submit:
 	  else \
 	    autolog=$$(mktemp); \
 	    if (cd "$(AUTOGRADER_DIR)" && ./run setup >"$$autolog" 2>&1); then \
-	      echo "  [OK] Autograder setup"; \
+	      reuse_note=""; \
+	      if grep -qi "already exists; reusing" "$$autolog"; then \
+	        reuse_note=" (Reusing existing Docker container)"; \
+	      fi; \
+	      echo "  [OK] Autograder setup$$reuse_note"; \
 	    else \
 	      echo "  [FAIL] Autograder setup"; \
 	      sed 's/^/    /' "$$autolog"; \
