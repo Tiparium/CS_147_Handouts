@@ -16,6 +16,7 @@ assignments/.testing/errors/
 
 # Local self-test logs
 .testing_selftest_attempt*.log
+.testing/Gradescope_Autograder_Template/.git/
 
 # Generated submissions (keep directory structure and submissions.txt)
 generated_turnins/**
