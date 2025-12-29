@@ -6,7 +6,7 @@ AUTOGRADER_IMAGE_NAME ?= gradescope/autograder-base
 CONFIG_FILE := $(CURDIR)/config.json
 CONFIG_SCRIPT := $(CURDIR)/student_config.py
 
-.PHONY: submit clean_turnins clean_docker clean student_name help -h $(ASSIGNMENTS)
+.PHONY: submit clean_turnins clean_docker clean student_name help -h wave_test $(ASSIGNMENTS)
 
 submit:
 	@if [ -z "$(ASSIGNMENT)" ]; then \
@@ -24,6 +24,7 @@ help -h:
 	@echo "Available make targets (run from repo root):"
 	@echo "  make submit <assignment>  - run submission for $(PUBLIC_ASSIGNMENTS)"
 	@echo "  make student_name         - show/update student name in config.json"
+	@echo "  make wave_test            - generate VCD waveforms for .testing mux examples"
 	@echo "  make clean_turnins        - delete generated submission archives (prompts)"
 	@echo "  make clean_docker         - remove local Docker images (toolchain + autograder base) (prompts; optional config cleanup)"
 	@echo "  make clean                - run all clean_* targets and remove local self-test logs"
@@ -31,6 +32,9 @@ help -h:
 	@if [ -z "$$RUN_HELP_SKIP_RUN" ]; then \
 		RUN_HELP_SKIP_MAKE=1 ./run --help-only; \
 	fi
+
+wave_test:
+	@./run make -C assignments/.testing waves
 
 clean_turnins:
 	@echo -n "This will wipe all existing generated turn in files. Are you sure you want to continue? [y/N] " ; \

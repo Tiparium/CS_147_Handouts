@@ -6,6 +6,7 @@ ASSIGNMENT_DIR := $(ASSIGNMENTS_ROOT)/.testing
 SUBMISSION_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions
 ERRORS_DIR := $(ASSIGNMENT_DIR)/errors
 AUTOGRADER_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template
+WAVES_DIR := $(ASSIGNMENT_DIR)/waves
 
 .PHONY: submit
 submit:
@@ -134,3 +135,16 @@ submit:
 	fi; \
 	if [ "$$secondary_status" != "pass" ]; then exit 1; fi; \
 	if [ "$$primary_status" != "pass" ]; then exit 1; fi
+
+.PHONY: waves
+waves:
+	@set -e; \
+	mkdir -p "$(WAVES_DIR)"; \
+	echo "Generating waveforms in $(WAVES_DIR)..."; \
+	iverilog -g2012 -D DUMP -D DUMPFILE_CONT=\"$(WAVES_DIR)/mux2_continuous.vcd\" -o "$(WAVES_DIR)/cont.out" "$(ASSIGNMENT_DIR)/mux2_continuous.v" "$(ASSIGNMENT_DIR)/tb_mux2_continuous.v"; \
+	vvp "$(WAVES_DIR)/cont.out" >/dev/null; \
+	iverilog -g2012 -D DUMP -D DUMPFILE_PROC=\"$(WAVES_DIR)/mux2_procedural.vcd\" -o "$(WAVES_DIR)/proc.out" "$(ASSIGNMENT_DIR)/mux2_procedural.v" "$(ASSIGNMENT_DIR)/tb_mux2_procedural.v"; \
+	vvp "$(WAVES_DIR)/proc.out" >/dev/null; \
+	rm -f "$(WAVES_DIR)/cont.out" "$(WAVES_DIR)/proc.out"; \
+	echo "Waveforms ready:"; \
+	ls -1 "$(WAVES_DIR)"/*.vcd
