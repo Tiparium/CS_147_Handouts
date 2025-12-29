@@ -30,6 +30,17 @@ module tb_mux2_continuous;
     end
   endtask
 
+`ifdef DUMP
+  initial begin
+`ifdef DUMPFILE_CONT
+    $dumpfile(`DUMPFILE_CONT);
+`else
+    $dumpfile("waves/mux2_continuous.vcd");
+`endif
+    $dumpvars(0, tb_mux2_continuous);
+  end
+`endif
+
   initial begin
     check(0, 0, 0, 0);
     check(0, 0, 1, 0);
