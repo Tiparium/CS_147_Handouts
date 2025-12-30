@@ -44,6 +44,10 @@ DOCKER_SOCK_VOLUME=()
 if [ -S /var/run/docker.sock ]; then
   DOCKER_SOCK_VOLUME=(-v /var/run/docker.sock:/var/run/docker.sock)
 fi
+TTY_FLAGS=()
+if [ -t 0 ] && [ -t 1 ]; then
+  TTY_FLAGS=(-it)
+fi
 
 print_help() {
   cat <<'EOF'
@@ -52,6 +56,7 @@ print_help() {
   ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
   ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
   ./run help                   Show this help plus top-level make targets.
+  ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
 EOF
 }
 
@@ -61,6 +66,11 @@ if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ 
     RUN_HELP_SKIP_RUN=1 make -s -C "$REPO_ROOT" help
   fi
   exit 0
+fi
+
+if [ "${1:-}" = "verilog_checker" ]; then
+  shift
+  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
 fi
 
 ensure_student_name() {
@@ -136,11 +146,6 @@ fi
 if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
   echo "Error: Docker image '$IMAGE_NAME' not found. Run './run setup' first." >&2
   exit 1
-fi
-
-TTY_FLAGS=()
-if [ -t 0 ] && [ -t 1 ]; then
-  TTY_FLAGS=(-it)
 fi
 
 if [ $# -eq 0 ]; then

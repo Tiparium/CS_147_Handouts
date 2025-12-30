@@ -14,7 +14,8 @@ RUN apt-get update && \
     python3-diff-match-patch \
     tree \
     vim \
-    docker.io && \
+    docker.io \
+    openjdk-17-jre-headless && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
