@@ -6,9 +6,10 @@ module mux2_procedural(
     output reg  y
 );
 always @* begin
-    if (sel)
-        y = b;
-    else
-        y = a;
+    case (sel)
+        1'b0: y = a;
+        1'b1: y = b;
+        default: y = 1'bx; // should never happen
+    endcase
 end
 endmodule

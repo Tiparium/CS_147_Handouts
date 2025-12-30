@@ -24,6 +24,11 @@ target="$1"
 
 run_file() {
   local f="$1"
+  local base
+  base="$(basename "$f")"
+  if [[ "$base" == tb_* ]] || [[ "$base" == *_tb.v ]] || [[ "$base" == *tb.v ]]; then
+    return 0
+  fi
   echo "  [CHECK] $f"
   java -cp "$CHECKER_DIR" Vcheck "$f"
 }

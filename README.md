@@ -27,21 +27,22 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 
 ## Submitting work (scaffolding)
 - Assignments live in `assignments/hw01` … `hw06`, `lab`, and `project`.
-- From repo root: `./run make submit hw01` (or `hw02`, `lab`, `project`, etc.).
-- Each assignment has its own `make submit` that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
-- `make submit` requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run make student_name` to set it.
+- From repo root: `./run submit hw01` (or `hw02`, `lab`, `project`, etc.).
+- Each assignment has its own submit flow that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
+- Submit requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run student_name` to set it.
 
 ## Common commands (root)
 - `./run setup` — build/pull the toolchain image, prompt for student name, run self-test
 - `./run shell` — interactive shell inside the container at your current repo subdir
 - `./run <cmd>` — run any command inside the container (e.g., `make test`, `iverilog …`)
 - `./run verilog_checker <assignment|path>` — run Vcheck on an assignment (recursive) or a specific `.v` file / non-recursive directory
-- `make submit <assignment>` — run the assignment’s submit flow
-- `make wave_test` — generate VCD waveforms for the .testing mux examples
-- `make student_name` — view/update your recorded student name
-- `make clean_turnins` — delete generated submission archives (prompts)
-- `make clean_docker` — remove local Docker images (toolchain + autograder base) with confirmation; optional config cleanup
-- `make clean` — run all clean_* targets and remove local self-test logs
+- `./run submit <assignment>` — run the assignment’s submit flow
+- `./run wave_test` — generate VCD waveforms for the .testing mux examples
+- `./run student_name` — view/update your recorded student name
+- `./run clean_turnins` — delete generated submission archives (prompts)
+- `./run clean_docker` — remove local Docker images (toolchain + autograder base) with confirmation; optional config cleanup
+- `./run nuke_docker` — forcibly remove only the toolchain and autograder images (cache) with confirmation
+- `./run clean` — run all clean_* targets and remove local self-test logs
 
 ## Notes
 - Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.

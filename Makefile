@@ -6,7 +6,7 @@ AUTOGRADER_IMAGE_NAME ?= gradescope/autograder-base
 CONFIG_FILE := $(CURDIR)/config.json
 CONFIG_SCRIPT := $(CURDIR)/student_config.py
 
-.PHONY: submit clean_turnins clean_docker clean student_name help -h wave_test $(ASSIGNMENTS)
+.PHONY: submit clean_turnins clean_docker nuke_docker clean student_name help -h wave_test $(ASSIGNMENTS)
 
 submit:
 	@if [ -z "$(ASSIGNMENT)" ]; then \
@@ -27,6 +27,7 @@ help -h:
 	@echo "  make wave_test            - generate VCD waveforms for .testing mux examples"
 	@echo "  make clean_turnins        - delete generated submission archives (prompts)"
 	@echo "  make clean_docker         - remove local Docker images (toolchain + autograder base) (prompts; optional config cleanup)"
+	@echo "  make nuke_docker          - forcibly remove only the toolchain/autograder images (cache) (prompts)"
 	@echo "  make clean                - run all clean_* targets and remove local self-test logs"
 	@echo "  make -h / make help       - show this help"
 	@if [ -z "$$RUN_HELP_SKIP_RUN" ]; then \
@@ -66,8 +67,28 @@ clean_docker:
 		          else \
 		            echo "python3 not found; skipping personal info cleanup."; \
 		          fi ;; \
-			    *) echo "Personal info preserved."; ;; \
-			  esac
+		    *) echo "Personal info preserved."; ;; \
+		  esac
+
+nuke_docker:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "Error: docker not found. Run this on the host (not inside ./run)."; \
+		exit 1; \
+	fi
+	@echo "This will forcibly remove ONLY the images for '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)' (including their tags). Other images are untouched."
+	@echo -n "Continue? [y/N] " ; \
+	  read ans ; \
+	  case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
+	  for ref in "$(DOCKER_IMAGE_NAME)" "$(DOCKER_IMAGE_NAME):latest" "$(AUTOGRADER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME):latest"; do \
+	    imgs=$$(docker images --filter=reference="$$ref" -q); \
+	    if [ -n "$$imgs" ]; then \
+	      echo "Removing images for $$ref..."; \
+	      echo "$$imgs" | xargs -r docker rmi -f >/dev/null; \
+	    else \
+	      echo "No images found for $$ref."; \
+	    fi; \
+	  done; \
+	  echo "Done. Note: other Docker images were not touched."
 
 clean: clean_turnins
 	@$(MAKE) clean_docker
