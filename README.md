@@ -18,6 +18,7 @@ You’ll be prompted for your name (used in submission zips). This builds the `c
   - `./run make test`
   - `./run iverilog -g2012 -o sim *.v`
   - `./run shell` for an interactive container shell
+  - `./run verilog_checker <assignment|path>` to run the Java Vcheck tool on assignments or specific files
 - From inside an assignment subfolder, prefix with `../run`:
   - `cd assignments/hw02`
   - `../../run make test`
@@ -29,6 +30,18 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - From repo root: `./run make submit hw01` (or `hw02`, `lab`, `project`, etc.).
 - Each assignment has its own `make submit` that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
 - `make submit` requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run make student_name` to set it.
+
+## Common commands (root)
+- `./run setup` — build/pull the toolchain image, prompt for student name, run self-test
+- `./run shell` — interactive shell inside the container at your current repo subdir
+- `./run <cmd>` — run any command inside the container (e.g., `make test`, `iverilog …`)
+- `./run verilog_checker <assignment|path>` — run Vcheck on an assignment (recursive) or a specific `.v` file / non-recursive directory
+- `make submit <assignment>` — run the assignment’s submit flow
+- `make wave_test` — generate VCD waveforms for the .testing mux examples
+- `make student_name` — view/update your recorded student name
+- `make clean_turnins` — delete generated submission archives (prompts)
+- `make clean_docker` — remove local Docker images (toolchain + autograder base) with confirmation; optional config cleanup
+- `make clean` — run all clean_* targets and remove local self-test logs
 
 ## Notes
 - Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.
