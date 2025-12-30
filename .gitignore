@@ -19,6 +19,7 @@ config.json
 assignments/.testing/errors/*
 assignments/.testing/Gradescope_Autograder_Template/failed tests/*
 assignments/.testing/Gradescope_Autograder_Template/local_results/*
+assignments/.testing/selftest_logs/*
 assignments/.testing/waves/*
 
 # Local self-test logs
