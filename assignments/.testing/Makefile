@@ -21,25 +21,35 @@ submit:
 	run_with_spinner() { \
 	  label="$$1"; shift; \
 	  start_ts=$$(date +%s); \
-	  i=0; \
-	  "$$@" & \
-	  cmd_pid=$$!; \
-	  while kill -0 "$$cmd_pid" 2>/dev/null; do \
+	  if [ -t 1 ]; then \
+	    i=0; \
+	    "$$@" & \
+	    cmd_pid=$$!; \
+	    while kill -0 "$$cmd_pid" 2>/dev/null; do \
+	      elapsed=$$(( $$(date +%s) - start_ts )); \
+	      mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
+	      case $$i in \
+	        0) spin_char='|' ;; \
+	        1) spin_char='/' ;; \
+	        2) spin_char='-' ;; \
+	        3) spin_char='\\' ;; \
+	      esac; \
+	      printf "\r  [INFO] %s: %s %02d:%02d" "$$label" "$$spin_char" "$$mins" "$$secs"; \
+	      i=$$(( (i + 1) % 4 )); \
+	      sleep 0.2; \
+	    done; \
+	    wait "$$cmd_pid"; rc=$$?; \
 	    elapsed=$$(( $$(date +%s) - start_ts )); \
 	    mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
-	    case $$i in \
-	      0) spin_char='|' ;; \
-	      1) spin_char='/' ;; \
-	      2) spin_char='-' ;; \
-	      3) spin_char='\\' ;; \
-	    esac; \
-	    printf "\r  [INFO] %s: %s %02d:%02d" "$$label" "$$spin_char" "$$mins" "$$secs"; \
-	    i=$$(( (i + 1) % 4 )); \
-	    sleep 0.2; \
-	  done; \
-	  wait "$$cmd_pid"; rc=$$?; \
-	  printf "\r"; \
-	  return $$rc; \
+	    printf "\r  [INFO] %s completed in %02d:%02d\n" "$$label" "$$mins" "$$secs"; \
+	    return $$rc; \
+	  else \
+	    "$$@"; rc=$$?; \
+	    elapsed=$$(( $$(date +%s) - start_ts )); \
+	    mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
+	    printf "  [INFO] %s completed in %02d:%02d\n" "$$label" "$$mins" "$$secs"; \
+	    return $$rc; \
+	  fi; \
 	}; \
 	section() { \
 	  name="$$1"; status_var="$$2"; shift 2; \
@@ -107,17 +117,23 @@ submit:
 	    rm -f "$$autolog"; \
 	  fi; \
 	}; \
-	run_secondary() { \
-	  secondary_status=pass; \
-	  check_cmd() { if command -v "$$1" >/dev/null 2>&1; then echo "  [OK] $$1"; else echo "  [FAIL] $$1 missing"; secondary_status=fail; fi; }; \
-	  check_python_module() { \
-	    if python3 -c "import importlib,sys; mod=sys.argv[1]; importlib.import_module(mod); print(f'  [OK] python module: {mod}')" "$$1"; then :; else echo "  [FAIL] python module missing: $$1"; secondary_status=fail; fi; \
-	  }; \
-	  check_cmd bash; \
-	  check_cmd make; \
-	  check_cmd git; \
-	  check_cmd python3; \
-	  check_cmd pip3; \
+run_secondary() { \
+  secondary_status=pass; \
+  check_cmd() { if command -v "$$1" >/dev/null 2>&1; then echo "  [OK] $$1"; else echo "  [FAIL] $$1 missing"; secondary_status=fail; fi; }; \
+  check_python_module() { \
+    if python3 -c "import importlib,sys; mod=sys.argv[1]; importlib.import_module(mod); print(f'  [OK] python module: {mod}')" "$$1"; then :; else echo "  [FAIL] python module missing: $$1"; secondary_status=fail; fi; \
+  }; \
+  if bash /repo/verilog_checker.sh "$(ASSIGNMENT_DIR)" >/dev/null 2>&1; then \
+    echo "  [OK] Verilog Syntax Checker"; \
+  else \
+    echo "  [FAIL] Verilog Syntax Checker"; \
+    secondary_status=fail; \
+  fi; \
+  check_cmd bash; \
+  check_cmd make; \
+  check_cmd git; \
+  check_cmd python3; \
+  check_cmd pip3; \
 	  check_cmd zip; \
 	  check_cmd unzip; \
 	  check_cmd tree; \
