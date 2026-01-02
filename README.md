@@ -41,8 +41,8 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - `./run student_name` — view/update your recorded student name
 - `./run clean_turnins` — delete generated submission archives (prompts)
 - `./run clean_docker` — remove local Docker images (toolchain + autograder base) with confirmation; optional config cleanup
-- `./run nuke_docker` — forcibly remove only the toolchain and autograder images (cache) with confirmation
 - `./run clean` — run all clean_* targets and remove local self-test logs
+- Host-only: `make nuke_docker` — forcibly remove the toolchain and autograder images (cache) with confirmations; do not run via `./run`
 
 ## Notes
 - Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.

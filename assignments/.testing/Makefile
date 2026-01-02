@@ -39,17 +39,13 @@ submit:
 	      sleep 0.2; \
 	    done; \
 	    wait "$$cmd_pid"; rc=$$?; \
-	    elapsed=$$(( $$(date +%s) - start_ts )); \
-	    mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
-	    printf "\r  [INFO] %s completed in %02d:%02d\n" "$$label" "$$mins" "$$secs"; \
-	    return $$rc; \
 	  else \
 	    "$$@"; rc=$$?; \
-	    elapsed=$$(( $$(date +%s) - start_ts )); \
-	    mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
-	    printf "  [INFO] %s completed in %02d:%02d\n" "$$label" "$$mins" "$$secs"; \
-	    return $$rc; \
 	  fi; \
+	  elapsed=$$(( $$(date +%s) - start_ts )); \
+	  mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
+	  printf "%02d:%02d\n" "$$mins" "$$secs"; \
+	  return $$rc; \
 	}; \
 	section() { \
 	  name="$$1"; status_var="$$2"; shift 2; \
@@ -88,25 +84,25 @@ submit:
 	    primary_status="fail"; \
 	  else \
 	    autolog=$$(mktemp); \
-	    if run_with_spinner "Autograder setup" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run setup >\"$$autolog\" 2>&1"; then \
+	    elapsed_setup=$$(run_with_spinner "Autograder setup" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run setup >\"$$autolog\" 2>&1"); \
+	    rc_setup=$$?; \
+	    if [ $$rc_setup -eq 0 ]; then \
 	      reuse_note=""; \
 	      if grep -qi "already exists; reusing" "$$autolog"; then \
 	        reuse_note=" (Reusing existing Docker container)"; \
 	      fi; \
-	      printf "\r"; \
-	      echo "  [OK] Autograder setup$$reuse_note"; \
+	      echo "  [OK] Autograder setup$$reuse_note (elapsed $$elapsed_setup)"; \
 	    else \
-	      printf "\r"; \
 	      echo "  [FAIL] Autograder setup"; \
 	      sed 's/^/    /' "$$autolog"; \
 	      primary_status="fail"; \
 	    fi; \
 	    if [ "$$primary_status" = "pass" ]; then \
-	      if run_with_spinner "Autograder grade" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run grade \"./test_submissions/submission_test.zip\" >>\"$$autolog\" 2>&1"; then \
-	        printf "\r"; \
-	        echo "  [OK] Autograder grade"; \
+	      elapsed_grade=$$(run_with_spinner "Autograder grade" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run grade \"./test_submissions/submission_test.zip\" >>\"$$autolog\" 2>&1"); \
+	      rc_grade=$$?; \
+	      if [ $$rc_grade -eq 0 ]; then \
+	        echo "  [OK] Autograder grade (elapsed $$elapsed_grade)"; \
 	      else \
-	        printf "\r"; \
 	        echo "  [FAIL] Autograder grade"; \
 	        sed 's/^/    /' "$$autolog"; \
 	        primary_status="fail"; \

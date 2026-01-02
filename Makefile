@@ -75,20 +75,47 @@ nuke_docker:
 		echo "Error: docker not found. Run this on the host (not inside ./run)."; \
 		exit 1; \
 	fi
-	@echo "This will forcibly remove ONLY the images for '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)' (including their tags). Other images are untouched."
-	@echo -n "Continue? [y/N] " ; \
-	  read ans ; \
-	  case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
-	  for ref in "$(DOCKER_IMAGE_NAME)" "$(DOCKER_IMAGE_NAME):latest" "$(AUTOGRADER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME):latest"; do \
-	    imgs=$$(docker images --filter=reference="$$ref" -q); \
-	    if [ -n "$$imgs" ]; then \
-	      echo "Removing images for $$ref..."; \
-	      echo "$$imgs" | xargs -r docker rmi -f >/dev/null; \
-	    else \
-	      echo "No images found for $$ref."; \
-	    fi; \
-	  done; \
-	  echo "Done. Note: other Docker images were not touched."
+	@if [ -f /.dockerenv ]; then \
+		echo "Error: Do NOT run nuke_docker inside the course container. Run from the host shell."; \
+		exit 1; \
+	fi
+	@echo "================ BIG RED BUTTON ================"; \
+	echo "You are about to forcibly stop/remove containers and images for:"; \
+	echo "  - $(DOCKER_IMAGE_NAME)"; \
+	echo "  - $(AUTOGRADER_IMAGE_NAME)"; \
+	echo "Other images will NOT be touched."; \
+	echo "================================================"; \
+	echo "If containers are running from these images, they must be stopped first."
+	@running_ids=$$(docker ps -q --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+	if [ -n "$$running_ids" ]; then \
+	  echo "WARNING: Found running containers that use these images:"; \
+	  docker ps --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"; \
+	  echo -n "Are you sure? Stop and remove these containers to continue? [y/N] " ; \
+	  read ansr ; \
+	  case $$ansr in y|Y) docker stop $$running_ids >/dev/null && docker rm $$running_ids >/dev/null ;; *) echo "Aborted."; exit 1;; esac; \
+	fi
+	@stopped_ids=$$(docker ps -aq --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+	if [ -n "$$stopped_ids" ]; then \
+	  echo "NOTE: Found stopped containers using these images; they will be removed."; \
+	  docker rm $$stopped_ids >/dev/null; \
+	fi
+	@target_ids=$$(docker images --filter=reference="$(DOCKER_IMAGE_NAME)" --filter=reference="$(DOCKER_IMAGE_NAME):latest" --filter=reference="$(AUTOGRADER_IMAGE_NAME)" --filter=reference="$(AUTOGRADER_IMAGE_NAME):latest" -q | sort -u); \
+	echo -n "Proceed to remove images (and remaining tags) for these IDs? [y/N] " ; \
+	read ans ; \
+	case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
+	if [ -n "$$target_ids" ]; then \
+	  echo "Removing images..."; \
+	  echo "$$target_ids" | xargs -r docker rmi -f >/dev/null || true; \
+	else \
+	  echo "No tagged images found for $(DOCKER_IMAGE_NAME) or $(AUTOGRADER_IMAGE_NAME)."; \
+	fi; \
+	dang=$$(docker images --filter dangling=true -q); \
+	if [ -n "$$dang" ]; then \
+	  echo -n "Optional: remove dangling <none> images too? [y/N] " ; \
+	  read ansd ; \
+	  case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
+	fi; \
+	echo "Done. Note: other Docker images were not touched."
 
 clean: clean_turnins
 	@$(MAKE) clean_docker
