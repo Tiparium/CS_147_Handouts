@@ -50,6 +50,40 @@ if [ -t 0 ] && [ -t 1 ]; then
 fi
 SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
 
+run_with_spinner() {
+  label="$1"; shift
+  start_ts=$(date +%s)
+  "$@" &
+  cmd_pid=$!
+  if [ -t 1 ]; then
+    i=0
+    while kill -0 "$cmd_pid" 2>/dev/null; do
+      elapsed=$(( $(date +%s) - start_ts ))
+      mins=$((elapsed / 60)); secs=$((elapsed % 60))
+      case $i in
+        0) spin_char='|' ;;
+        1) spin_char='/' ;;
+        2) spin_char='-' ;;
+        3) spin_char='\\' ;;
+      esac
+      printf "\r  [INFO] %s: %s %02d:%02d" "$label" "$spin_char" "$mins" "$secs"
+      i=$(( (i + 1) % 4 ))
+      sleep 0.2
+    done
+    wait "$cmd_pid"; rc=$?
+    elapsed=$(( $(date +%s) - start_ts ))
+    mins=$((elapsed / 60)); secs=$((elapsed % 60))
+    printf "\r  [INFO] %s completed in %02d:%02d\n" "$label" "$mins" "$secs"
+    return $rc
+  else
+    wait "$cmd_pid"; rc=$?
+    elapsed=$(( $(date +%s) - start_ts ))
+    mins=$((elapsed / 60)); secs=$((elapsed % 60))
+    printf "  [INFO] %s completed in %02d:%02d\n" "$label" "$mins" "$secs"
+    return $rc
+  fi
+}
+
 print_help() {
   cat <<'EOF'
 ./run commands:
@@ -63,7 +97,6 @@ print_help() {
   ./run student_name           View/update the recorded student name.
   ./run clean_turnins          Delete generated submission archives (prompts).
   ./run clean_docker           Remove toolchain/autograder images (prompts; optional config cleanup).
-  ./run nuke_docker            Forcibly remove only the course images (prompts).
   ./run clean                  Run all clean_* targets and remove local self-test logs.
 EOF
 }
@@ -82,7 +115,7 @@ if [ "${1:-}" = "verilog_checker" ]; then
 fi
 
 case "${1:-}" in
-  submit|clean_turnins|clean_docker|nuke_docker|clean|student_name|wave_test)
+  submit|clean_turnins|clean_docker|clean|student_name|wave_test)
     target="$1"; shift
     exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;
@@ -132,7 +165,7 @@ if [ "${1:-}" = "setup" ]; then
   while [ $attempt -le 3 ]; do
     echo "---------------- attempt $attempt/3 ----------------"
     log_file="$SELFTEST_LOG_DIR/.testing_selftest_attempt${attempt}.log"
-    if docker run --rm -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" bash -lc "set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\"$TEST_FORCE\"}" >"$log_file" 2>&1; then
+    if run_with_spinner "Self-test attempt $attempt" docker run --rm -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" bash -lc "set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\"$TEST_FORCE\"}" >"$log_file" 2>&1; then
       cat "$log_file"
       echo "============================================================"
       echo "[SELF-TEST] PASS"
