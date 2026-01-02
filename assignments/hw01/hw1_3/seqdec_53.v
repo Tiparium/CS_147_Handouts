@@ -6,5 +6,5 @@ module seqdec_53 (
     input Reset,
     output Out
 );
-    // TODO: design FSM with overlapping detection allowed
+    // TODO
 endmodule
