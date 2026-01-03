@@ -94,6 +94,7 @@ print_help() {
   ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
   ./run submit <assignment>    Run the assignment submit flow.
   ./run wave_test              Generate VCD waveforms for the .testing mux examples.
+  ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
   ./run student_name           View/update the recorded student name.
   ./run clean_turnins          Delete generated submission archives (prompts).
   ./run clean_docker           Remove toolchain/autograder images (prompts; optional config cleanup).
@@ -112,6 +113,11 @@ fi
 if [ "${1:-}" = "verilog_checker" ]; then
   shift
   exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
+fi
+
+if [ "${1:-}" = "test" ]; then
+  shift
+  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
 fi
 
 case "${1:-}" in

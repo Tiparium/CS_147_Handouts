@@ -8,6 +8,10 @@ cs147-verilog-toolchain.img
 # Global log ignores (keep directories, ignore log files)
 *.log
 **/*.log
+*.out
+**/*.out
+dump.vcd
+**/dump.vcd
 
 # Local student config
 config.json
