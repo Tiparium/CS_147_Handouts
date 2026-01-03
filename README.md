@@ -18,6 +18,7 @@ You’ll be prompted for your name (used in submission zips). This builds the `c
   - `./run make test`
   - `./run iverilog -g2012 -o sim *.v`
   - `./run shell` for an interactive container shell
+  - `./run test hw01 [hw1_2]` to run assignment benches (quiet summary by default; add `-v` for full logs)
   - `./run verilog_checker <assignment|path>` to run the Java Vcheck tool on assignments or specific files
 - From inside an assignment subfolder, prefix with `../run`:
   - `cd assignments/hw02`
@@ -35,6 +36,7 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - `./run setup` — build/pull the toolchain image, prompt for student name, run self-test
 - `./run shell` — interactive shell inside the container at your current repo subdir
 - `./run <cmd>` — run any command inside the container (e.g., `make test`, `iverilog …`)
+- `./run test <hw> [sub]` — run testbenches for an assignment (quiet PASS/FAIL summary; add `-v` for full logs)
 - `./run verilog_checker <assignment|path>` — run Vcheck on an assignment (recursive) or a specific `.v` file / non-recursive directory
 - `./run submit <assignment>` — run the assignment’s submit flow
 - `./run wave_test` — generate VCD waveforms for the .testing mux examples

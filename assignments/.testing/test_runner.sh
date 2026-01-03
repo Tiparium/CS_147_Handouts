@@ -51,6 +51,21 @@ for subdir in "${subdirs[@]}"; do
     continue
   fi
 
+  checker_status=0
+  checker_log="verilog_checker.log"
+  if [ "$VERBOSE" -eq 1 ]; then
+    echo "============================================================"
+    echo "[CHECKER] $(basename "$subdir")"
+    echo "------------------------------------------------------------"
+    echo "[CMD] verilog_checker $subdir"
+  fi
+  if ! bash /repo/verilog_checker.sh "$subdir" >"$checker_log" 2>&1; then
+    checker_status=1
+    [ "$VERBOSE" -eq 1 ] && cat "$checker_log"
+  else
+    [ "$VERBOSE" -eq 1 ] && cat "$checker_log"
+  fi
+
   sub_errors=0
   for bench in "${bench_files[@]}"; do
     top="${bench%.v}"
@@ -58,7 +73,7 @@ for subdir in "${subdirs[@]}"; do
     log="${top}.log"
 
     if [ "$VERBOSE" -eq 1 ]; then
-      echo "------------------------------------------------------------"
+      echo "============================================================"
       echo "[RUN] $(basename "$subdir") / $bench"
       echo "[CMD] iverilog -g2012 -s $top -o $out *.v"
     fi
@@ -93,9 +108,14 @@ for subdir in "${subdirs[@]}"; do
   done
 
   if [ "$sub_errors" -eq 0 ]; then
-    echo "[PASS] $(basename "$subdir") (errors: 0)"
+    if [ "$checker_status" -eq 0 ]; then
+      echo "[PASS] $(basename "$subdir") (errors: 0; Legal syntax Check: PASS)"
+    else
+      echo "[FAIL] $(basename "$subdir") (errors: 0; Legal syntax Check: FAIL)"
+      overall_status=1
+    fi
   else
-    echo "[FAIL] $(basename "$subdir") (errors: $sub_errors)"
+    echo "[FAIL] $(basename "$subdir") (errors: $sub_errors; Legal syntax Check: $([ "$checker_status" -eq 0 ] && echo PASS || echo FAIL))"
     overall_status=1
   fi
 done
