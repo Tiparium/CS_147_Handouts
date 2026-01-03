@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Per-assignment defaults (overridable via env: ASSIGNMENT_NAME, GRADER_SCRIPT, TOTAL_POINTS)
+DEFAULT_ASSIGNMENT_NAME="Programming Assignment"
+DEFAULT_GRADER_SCRIPT="grade.py"
+DEFAULT_TOTAL_POINTS=100
+LABNAME_FILE="/autograder/source/labname.cfg"
+
+ROOT="/autograder"
+SRC="$ROOT/source"
+SUB="$ROOT/submission"
+RES="$ROOT/results"
+
+if [ -z "${ASSIGNMENT_NAME:-}" ] && [ -f "$LABNAME_FILE" ]; then
+  ASSIGNMENT_NAME="$(cat "$LABNAME_FILE")"
+fi
+ASSIGNMENT_NAME="${ASSIGNMENT_NAME:-$DEFAULT_ASSIGNMENT_NAME}"
+GRADER_SCRIPT="${GRADER_SCRIPT:-$DEFAULT_GRADER_SCRIPT}"
+TOTAL_POINTS_VAL="${TOTAL_POINTS:-$DEFAULT_TOTAL_POINTS}"
+
+mkdir -p "$RES"
+
+echo "=== Autograder: $ASSIGNMENT_NAME ==="
+echo " grader     : $GRADER_SCRIPT"
+echo " total pts  : $TOTAL_POINTS_VAL"
+echo " submission : $SUB"
+echo " results    : $RES"
+echo "-------------------------------------"
+
+# 0) setup (optional; best-effort)
+echo "[1/4] setup.sh (if present)"
+if [ -f "$SRC/setup.sh" ]; then
+  chmod +x "$SRC/setup.sh" || true
+  bash "$SRC/setup.sh" >"$RES/setup.log" 2>&1 || echo "[warn] setup.sh returned non-zero; continuing."
+else
+  echo "(skip) no setup.sh found"
+fi
+
+# 1) put grader + traces into submission
+echo "[2/4] syncing grader and traces"
+cp -f "$SRC/$GRADER_SCRIPT" "$SUB/$GRADER_SCRIPT"
+
+if [ -d "$SRC/traces" ]; then
+  rm -rf "$SUB/traces"
+  cp -r "$SRC/traces" "$SUB/traces"
+else
+  echo "(info) no traces/ directory to copy"
+fi
+
+# normalize endings (helps with Windows submissions)
+if command -v dos2unix >/dev/null 2>&1; then
+  find "$SUB" -type f \( -name "*.sh" -o -name "*.py" -o -name "Makefile" \) -exec dos2unix -q {} \; || true
+fi
+
+# 2) run grader inside submission
+echo "[3/4] running grader ($GRADER_SCRIPT)"
+set +e
+pushd "$SUB" >/dev/null
+  python3 -u "$GRADER_SCRIPT" \
+    > >(tee "$RES/grader_output.txt") \
+    2> "$RES/grader_errors.txt"
+  GRADER_RC=$?
+  echo "[3/4] grader exit code: $GRADER_RC"
+  if [ -s "$RES/grader_errors.txt" ]; then
+    echo "[grader errors]" | tee -a "$RES/grader_output.txt"
+    cat "$RES/grader_errors.txt" | tee -a "$RES/grader_output.txt"
+  fi
+popd >/dev/null
+set -e
+
+# 3) parse → results.json (always try)
+echo "[4/4] parsing output -> results.json (max=$TOTAL_POINTS_VAL)"
+
+GEN_ARGS=(
+  --in "$RES/grader_output.txt"
+  --out "$RES/results.json"
+  --assignment-name "$ASSIGNMENT_NAME"
+)
+GEN_ARGS+=(--total-points "$TOTAL_POINTS_VAL")
+FALLBACK_MAX="$TOTAL_POINTS_VAL"
+python3 "$SRC/gen_output.py" "${GEN_ARGS[@]}" \
+  2>&1 | tee "$RES/parser.log" || true
+
+# 4) fallback results if parser failed
+if [ ! -s "$RES/results.json" ]; then
+  cat > "$RES/results.json" <<JSON
+{
+  "score": 0,
+  "visibility": "visible",
+  "stdout_visibility": "visible",
+  "tests": [
+    {
+      "name": "$ASSIGNMENT_NAME",
+      "score": 0,
+      "max_score": ${FALLBACK_MAX},
+      "output": "Autograder failed before producing results. Check grader_output.txt.",
+      "visibility": "visible"
+    }
+  ]
+}
+JSON
+fi
+
+echo "[done] grading complete"
+
+exit 0
