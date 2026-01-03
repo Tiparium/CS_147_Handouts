@@ -22,6 +22,16 @@ assignment="$1"; shift
 subproblem="${1:-}"
 
 hw_dir="$ASSIGN_ROOT/$assignment"
+# Allow "hw1" input to map to "hw01" if present.
+if [ ! -d "$hw_dir" ] && [[ "$assignment" =~ ^hw([0-9]+)$ ]]; then
+  num="${BASH_REMATCH[1]}"
+  padded="$(printf "hw%02d" "$num")"
+  if [ -d "$ASSIGN_ROOT/$padded" ]; then
+    assignment="$padded"
+    hw_dir="$ASSIGN_ROOT/$assignment"
+  fi
+fi
+
 if [ ! -d "$hw_dir" ]; then
   echo "Assignment not found: $assignment" >&2
   exit 1

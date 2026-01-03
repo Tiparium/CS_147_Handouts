@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Helper to mirror Gradescope locally.
+# Commands:
+#   ./run setup              -> build local image from docker/Dockerfile
+#   ./run grade <submission> -> run autograder against a submission dir (default: first in test_submissions)
+
+IMAGE_TAG="${IMAGE_TAG:-gradescope/autograder-base}"
+RESULTS_DIR="${RESULTS_DIR:-local_results}"
+SUBMISSIONS_ROOT="${SUBMISSIONS_ROOT:-test_submissions}"
+cleanup_dir=""
+progress_pid=""
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./run setup [--rebuild]
+  ./run grade <submission_dir|submission.zip>
+    - If <submission> is omitted, uses the first directory or zip under test_submissions/.
+Env overrides:
+  IMAGE_TAG, DOCKERFILE, RESULTS_DIR, SUBMISSIONS_ROOT
+EOF
+}
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "docker is required but not found in PATH" >&2
+    exit 1
+  fi
+}
+
+require_unzip() {
+  if ! command -v unzip >/dev/null 2>&1; then
+    echo "unzip is required to grade a .zip submission but is not in PATH" >&2
+    exit 1
+  fi
+}
+
+pick_submission() {
+  local chosen="$1"
+  if [ -n "$chosen" ]; then
+    echo "$chosen"
+    return
+  fi
+  chosen=$(find "$SUBMISSIONS_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o \( -type f -name "*.zip" \) \) | head -n 1 2>/dev/null || true)
+  echo "$chosen"
+}
+
+prepare_submission() {
+  local path="$1"
+  if [ -d "$path" ]; then
+    echo "$path"
+    return
+  fi
+
+  if [ -f "$path" ] && [[ "$path" == *.zip ]]; then
+    require_unzip
+    cleanup_dir="$(mktemp -d -t autograder_submission.XXXXXX)"
+    echo "Unzipping submission '$path' -> $cleanup_dir" >&2
+    unzip -q "$path" -d "$cleanup_dir"
+    echo "$cleanup_dir"
+    return
+  fi
+
+  echo "Submission not found or unsupported format: $path" >&2
+  exit 1
+}
+
+cleanup() {
+  if [ -n "$cleanup_dir" ] && [ -d "$cleanup_dir" ]; then
+    rm -rf "$cleanup_dir"
+  fi
+  if [ -n "$progress_pid" ]; then
+    kill "$progress_pid" 2>/dev/null || true
+  fi
+}
+
+progress() {
+  local pid="$1"
+  local start_ts="$2"
+  local chars='|/-\\'
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    local elapsed=$(( $(date +%s) - start_ts ))
+    local mins=$(( elapsed / 60 ))
+    local secs=$(( elapsed % 60 ))
+    printf "\r[progress] %02d:%02d %s" "$mins" "$secs" "${chars:i:1}" >&2
+    i=$(( (i + 1) % ${#chars} ))
+    sleep 0.25
+  done
+  local elapsed=$(( $(date +%s) - start_ts ))
+  local mins=$(( elapsed / 60 ))
+  local secs=$(( elapsed % 60 ))
+  printf "\r[progress] done in %02d:%02d   \n" "$mins" "$secs" >&2
+}
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  setup)
+    require_docker
+    if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+      echo "Image '$IMAGE_TAG' already exists; reusing."
+      exit 0
+    fi
+    echo "Pulling base image '$IMAGE_TAG' ..."
+    docker pull "$IMAGE_TAG"
+    echo "Done."
+    ;;
+
+  grade)
+    require_docker
+    trap cleanup EXIT
+    submission_arg="${1:-}"
+    submission=$(pick_submission "$submission_arg")
+    if [ -z "$submission" ]; then
+      echo "Submission not found. Provide one: ./run grade test_submissions/<case_or_zip>" >&2
+      exit 1
+    fi
+    submission_dir=$(prepare_submission "$submission")
+    submission_abs=$(cd "$submission_dir" && pwd)
+    mkdir -p "$RESULTS_DIR"
+    run_log="$RESULTS_DIR/docker.log"
+    echo "=== Local Gradescope Runner ==="
+    echo " submission : $submission_abs"
+    echo " results    : $RESULTS_DIR"
+    echo " log        : $run_log"
+    echo " image      : $IMAGE_TAG"
+    echo "-------------------------------"
+    echo "[container] streaming output below..."
+    start_ts=$(date +%s)
+    set +e
+    docker run --rm -t \
+      -v "$PWD":/autograder/source \
+      -v "$submission_abs":/autograder/submission \
+      -v "$PWD/$RESULTS_DIR":/autograder/results \
+      -e VERBOSE=1 \
+      -e PYTHONUNBUFFERED=1 \
+      "$IMAGE_TAG" \
+      /bin/bash -lc "cd /autograder/source && ./run_autograder" \
+      2>&1 | while IFS= read -r line; do printf "[container] %s\n" "$line"; done | tee "$run_log" &
+    pipe_pid=$!
+    progress "$pipe_pid" "$start_ts" &
+    progress_pid=$!
+    wait "$pipe_pid"
+    run_rc=$?
+    set -e
+    if [ -n "$progress_pid" ]; then
+      kill "$progress_pid" 2>/dev/null || true
+      progress_pid=""
+    fi
+    echo "-------------------------------"
+    echo "Done (exit $run_rc). See $RESULTS_DIR for outputs (full log: $run_log)."
+    ;;
+
+  ""|-h|--help|help)
+    usage
+    ;;
+
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage
+    exit 1
+    ;;
+esac
