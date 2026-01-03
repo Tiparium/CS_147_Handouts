@@ -12,6 +12,8 @@ cs147-verilog-toolchain.img
 **/*.out
 dump.vcd
 **/dump.vcd
+submission_report.txt
+**/.last_submit_zip
 
 # Local student config
 config.json

@@ -11,6 +11,8 @@ RESULTS_DIR="${RESULTS_DIR:-local_results}"
 SUBMISSIONS_ROOT="${SUBMISSIONS_ROOT:-test_submissions}"
 cleanup_dir=""
 progress_pid=""
+VERBOSE="${AG_VERBOSE:-0}"
+DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
 
 usage() {
   cat <<'EOF'
@@ -57,7 +59,9 @@ prepare_submission() {
   if [ -f "$path" ] && [[ "$path" == *.zip ]]; then
     require_unzip
     cleanup_dir="$(mktemp -d -t autograder_submission.XXXXXX)"
-    echo "Unzipping submission '$path' -> $cleanup_dir" >&2
+    if [ "$VERBOSE" -eq 1 ]; then
+      echo "Unzipping submission '$path' -> $cleanup_dir" >&2
+    fi
     unzip -q "$path" -d "$cleanup_dir"
     echo "$cleanup_dir"
     return
@@ -92,7 +96,7 @@ progress() {
   local elapsed=$(( $(date +%s) - start_ts ))
   local mins=$(( elapsed / 60 ))
   local secs=$(( elapsed % 60 ))
-  printf "\r[progress] done in %02d:%02d   \n" "$mins" "$secs" >&2
+  printf "\r[progress] done in %02d:%02d   \r" "$mins" "$secs" >&2
 }
 
 cmd="${1:-}"
@@ -123,36 +127,105 @@ case "$cmd" in
     submission_abs=$(cd "$submission_dir" && pwd)
     mkdir -p "$RESULTS_DIR"
     run_log="$RESULTS_DIR/docker.log"
-    echo "=== Local Gradescope Runner ==="
-    echo " submission : $submission_abs"
-    echo " results    : $RESULTS_DIR"
-    echo " log        : $run_log"
-    echo " image      : $IMAGE_TAG"
-    echo "-------------------------------"
-    echo "[container] streaming output below..."
+    if [ "$VERBOSE" -eq 1 ]; then
+      echo "=== Local Gradescope Runner ==="
+      echo " submission : $submission_abs"
+      echo " results    : $RESULTS_DIR"
+      echo " log        : $run_log"
+      echo " image      : $IMAGE_TAG"
+      echo "-------------------------------"
+    fi
     start_ts=$(date +%s)
     set +e
-    docker run --rm -t \
+    # Run autograder with spinner; verbose shows log afterward, quiet keeps log only.
+    docker run --rm $DOCKER_PLATFORM_FLAG \
       -v "$PWD":/autograder/source \
       -v "$submission_abs":/autograder/submission \
       -v "$PWD/$RESULTS_DIR":/autograder/results \
-      -e VERBOSE=1 \
+      -e VERBOSE=0 \
       -e PYTHONUNBUFFERED=1 \
       "$IMAGE_TAG" \
       /bin/bash -lc "cd /autograder/source && ./run_autograder" \
-      2>&1 | while IFS= read -r line; do printf "[container] %s\n" "$line"; done | tee "$run_log" &
+      >"$run_log" 2>&1 &
     pipe_pid=$!
     progress "$pipe_pid" "$start_ts" &
     progress_pid=$!
     wait "$pipe_pid"
     run_rc=$?
-    set -e
     if [ -n "$progress_pid" ]; then
       kill "$progress_pid" 2>/dev/null || true
+      wait "$progress_pid" 2>/dev/null || true
       progress_pid=""
+    fi
+    printf "\r" >&2
+    if [ "$VERBOSE" -eq 1 ]; then
+      cat "$run_log"
+    fi
+    set -e
+    # Print a concise summary from grader output/results using the autograder image
+    results_dir_path="$PWD/$RESULTS_DIR"
+    if [ -d "$results_dir_path" ]; then
+      echo "================ AUTOGRADER SUMMARY ================"
+      docker run --rm $DOCKER_PLATFORM_FLAG \
+        -e AG_VERBOSE="$VERBOSE" \
+        -v "$PWD":/autograder/source \
+        -v "$submission_abs":/autograder/submission \
+        -v "$results_dir_path":/autograder/results \
+        "$IMAGE_TAG" \
+        /bin/bash -lc '
+          set -e
+          cd /autograder/results
+          if [ -f results.json ]; then
+            python3 - <<'"'"'PY'"'"'
+import json, os, pathlib
+verbose = int(os.environ.get("AG_VERBOSE", "0"))
+path = pathlib.Path("results.json")
+try:
+    data = json.loads(path.read_text())
+    score = data.get("score")
+    output = data.get("output")
+    tests = data.get("tests")
+    if not isinstance(tests, list):
+        tests = []
+    total_vals = [t.get("max_score") for t in tests if isinstance(t, dict) and t.get("max_score") is not None]
+    total = sum(total_vals) if total_vals else None
+    final_line = f"Final score: {score}/{total}" if total is not None else f"Final score: {score}"
+    print("***** FINAL SCORE *****")
+    print(final_line)
+    print("***********************")
+    if verbose:
+        if output:
+            print("[grader_output]")
+            print(output)
+        if tests:
+            print("[tests]")
+            for t in tests:
+                if not isinstance(t, dict):
+                    continue
+                name = t.get("name", "")
+                sc = t.get("score")
+                ms = t.get("max_score")
+                out = t.get("output")
+                print(f"- {name}: {sc}/{ms}")
+                if out:
+                    print(out)
+except Exception as e:
+    print(f"(could not parse results.json: {e})")
+PY
+          else
+            echo "(results.json not found)"
+          fi
+        '
+      echo "===================================================="
+      echo "NOTE: This is a local pre-check."
+      echo "You must still upload the generated submission zip to Gradescope."
+      echo "This reflects the grade you should expect there."
+    else
+      echo "[warn] results directory not found; skipping summary."
     fi
     echo "-------------------------------"
     echo "Done (exit $run_rc). See $RESULTS_DIR for outputs (full log: $run_log)."
+    exit $run_rc
     ;;
 
   ""|-h|--help|help)

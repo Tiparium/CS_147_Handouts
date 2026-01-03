@@ -1,7 +1,7 @@
 LABNAME_FILE := labname.cfg
 LABNAME ?= $(shell [ -f $(LABNAME_FILE) ] && cat $(LABNAME_FILE) || echo "")
 
-.PHONY: name submit
+.PHONY: name submit clean
 
 name:
 	@lab="$(LAB)"; \
@@ -24,3 +24,7 @@ submit:
 	out="drafts/$$lab"_draft_"$$next_padded".zip; \
 	echo "Creating $$out"; \
 	zip -r "$$out" . -x "drafts/*" "docker/*" "test_submissions/*"
+
+clean:
+	rm -rf local_results/*
+	find test_submissions -type f ! -name ".gitkeep" -delete

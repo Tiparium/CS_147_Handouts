@@ -29,7 +29,11 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 ## Submitting work (scaffolding)
 - Assignments live in `assignments/hw01` … `hw06`, `lab`, and `project`.
 - From repo root: `./run submit hw01` (or `hw02`, `lab`, `project`, etc.).
-- Each assignment has its own submit flow that currently emits a placeholder message and zips the assignment directory into `generated_turnins/<assignment>/`. Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
+- Submit runs `./run test` first (verilog checker + benches), prepends file hashes to a `submission_report.txt`, and zips the assignment into `generated_turnins/<assignment>/` (unless `-justgrade` is used). Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
+- A copy of the zip is also placed in the assignment’s `Gradescope_Autograder_Template/test_submissions/` for you to run the autograder on the host (`./run grade test_submissions/<zip>` from that folder). `-nograde`/`-justgrade` simply control whether the student zip is produced; no autograder is run inside `./run submit`.
+- Even after the local autograder run, you must still upload the generated submission zip to Gradescope.
+- The local score is what you should expect there.
+- This is only a local pre-check.
 - Submit requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run student_name` to set it.
 
 ## Common commands (root)
