@@ -121,7 +121,68 @@ if [ "${1:-}" = "test" ]; then
 fi
 
 case "${1:-}" in
-  submit|clean_turnins|clean_docker|clean|student_name|wave_test)
+  submit)
+    target="$1"; shift
+    nograde="0"
+    justgrade="0"
+    submit_verbose="0"
+    assignment_arg=""
+    declare -a extra_make_args=()
+    # Parse flags anywhere; first non-flag hw* is the assignment.
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        -nograde) nograde="1" ;;
+        -justgrade) justgrade="1" ;;
+        -v|--verbose) submit_verbose="1" ;;
+        hw[0-9]*) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
+        *) extra_make_args+=("$1") ;;
+      esac
+      shift
+    done
+    if [ -z "$assignment_arg" ]; then
+      echo "[submit] assignment name required (e.g., hw01)" >&2
+      exit 1
+    fi
+    if [ ${#extra_make_args[@]} -gt 0 ]; then
+      set -- "$assignment_arg" "${extra_make_args[@]}"
+    else
+      set -- "$assignment_arg"
+    fi
+    # Run submit inside the container first.
+    docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
+    rc=$?
+    if [ $rc -ne 0 ]; then
+      exit $rc
+    fi
+    # Host-side autograder run unless -nograde
+    if [ "$nograde" = "1" ]; then
+      echo "[submit] host autograder skipped (nograde)"
+      exit 0
+    fi
+    # Normalize hw number (accept hw1 or hw01)
+    case "$assignment_arg" in
+      hw[0-9]) assignment_arg=$(printf "hw%02d" "${assignment_arg#hw}") ;;
+    esac
+    marker_path="$REPO_ROOT/assignments/$assignment_arg/.last_submit_zip"
+    if [ ! -f "$marker_path" ]; then
+      echo "[submit] marker file not found for host autograder: $marker_path" >&2
+      exit 1
+    fi
+    rel_entry=$(cat "$marker_path")
+    zip_name="${rel_entry##*/}"
+    grader_dir="$REPO_ROOT/assignments/$assignment_arg/Gradescope_Autograder_Template"
+    if [ ! -d "$grader_dir" ]; then
+      echo "[submit] Gradescope_Autograder_Template not found for $assignment_arg; skipping host autograder." >&2
+      exit 1
+    fi
+    echo "[submit] running host autograder..."
+    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" ./run grade "test_submissions/$zip_name")
+    grade_rc=$?
+    echo "[submit] cleaning autograder artifacts..."
+    (cd "$grader_dir" && make clean >/dev/null 2>&1 || true)
+    exit $grade_rc
+    ;;
+  clean_turnins|clean_docker|clean|student_name|wave_test)
     target="$1"; shift
     exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;

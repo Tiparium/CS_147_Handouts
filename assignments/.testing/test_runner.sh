@@ -40,12 +40,13 @@ fi
 if [ -n "$subproblem" ]; then
   subdirs=("$hw_dir/$subproblem")
 else
-  # All immediate subdirectories (e.g., hw1_1, hw1_2, ...)
-  mapfile -t subdirs < <(find "$hw_dir" -maxdepth 1 -mindepth 1 -type d | sort)
+  # All immediate subdirectories (e.g., hw1_1, hw1_2, ...) skipping autograder template
+  mapfile -t subdirs < <(find "$hw_dir" -maxdepth 1 -mindepth 1 -type d ! -name "Gradescope_Autograder_Template" | sort)
 fi
 
 overall_status=0
 
+echo "================ TEST SUMMARY ================="
 for subdir in "${subdirs[@]}"; do
   if [ ! -d "$subdir" ]; then
     echo "Skipping missing subproblem: $subdir" >&2
@@ -129,5 +130,6 @@ for subdir in "${subdirs[@]}"; do
     overall_status=1
   fi
 done
+echo "================================================"
 
 exit $overall_status

@@ -22,14 +22,45 @@ else
 endif
 
 SUBMISSION_BASENAME := $(ASSIGNMENT_NAME)_$(STUDENT_NAME)_submission
+LAST_ZIP_MARKER := $(ASSIGNMENT_DIR)/.last_submit_zip
 
 .PHONY: submit
 ifndef CUSTOM_SUBMIT
 submit:
-	@echo "[Assignemnt] Make Submit behavior has not yet been implemented."
-	@mkdir -p "$(SUBMISSION_DIR)"
-	@i=1; while [ -e "$(SUBMISSION_DIR)/$(SUBMISSION_BASENAME)$${i}.zip" ]; do i=$$((i+1)); done; \
+	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
+	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
+	@set +e; test_rc=0; \
+	(cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh $(ASSIGNMENT_NAME) | tee "$(ASSIGNMENT_DIR)/submission_report.txt"'); \
+	test_rc=$$?; set -e; \
+	if [ "$$test_rc" -ne 0 ]; then \
+	  echo "[submit] NOTE: Tests reported failures (rc=$$test_rc). See $(ASSIGNMENT_NAME)/submission_report.txt for details."; \
+	fi
+	@echo "[submit] computing hashes..."
+	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) | LC_ALL=C sort | sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
+	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.txt" >"$(ASSIGNMENT_DIR)/submission_report.txt.tmp"
+	@mv "$(ASSIGNMENT_DIR)/submission_report.txt.tmp" "$(ASSIGNMENT_DIR)/submission_report.txt"
+	@rm -f "$(ASSIGNMENT_DIR)/hashes.tmp"
+	@zip_path="" ; name="" ; marker="$(LAST_ZIP_MARKER)"; \
+	if [ "${JUSTGRADE}" = "1" ]; then \
+	  zip_path="$(ASSIGNMENT_DIR)/grade_tmp_submission.zip"; \
+	  name="$${zip_path##*/}"; \
+	  echo "[submit] creating temp grader archive: $${name}"; \
+	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
+	else \
+	  mkdir -p "$(SUBMISSION_DIR)"; \
+	  i=1; while [ -e "$(SUBMISSION_DIR)/$(SUBMISSION_BASENAME)$${i}.zip" ]; do i=$$((i+1)); done; \
 	  name="$(SUBMISSION_BASENAME)$${i}.zip"; \
-	  echo "Creating submission archive: $${name}"; \
-	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$(SUBMISSION_DIR)/$${name}" .)
+	  zip_path="$(SUBMISSION_DIR)/$${name}"; \
+	  echo "[submit] creating submission archive: $${name}"; \
+	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
+	fi; \
+	if [ -d "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions" ]; then \
+	  cp "$${zip_path}" "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions/$${name}"; \
+	  echo "$(ASSIGNMENT_NAME) Gradescope_Autograder_Template/test_submissions/$${name}" > "$${marker}"; \
+	  echo "[submit] grader copy ready at Gradescope_Autograder_Template/test_submissions/$${name}"; \
+	else \
+	  echo "[submit] Gradescope_Autograder_Template/test_submissions not found; skipping grader copy."; \
+	fi; \
+	if [ "${JUSTGRADE}" = "1" ]; then rm -f "$${zip_path}"; fi
+	@rm -f "$(ASSIGNMENT_DIR)/submission_report.txt"
 endif

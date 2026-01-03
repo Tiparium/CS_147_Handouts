@@ -92,7 +92,13 @@ def main() -> int:
 
     final_score = remap_score(curved_percent)
 
-    print("[grading summary]")
+    print("=== Grading Summary ===")
+    print(f"Total points: {TOTAL_POINTS:.2f}")
+    print(f"Raw percent : {raw_percent:.2f}%")
+    print(f"Curve note  : {timing_flag}")
+    print(f"Curved pct  : {curved_percent:.2f}%")
+    print(f"Final score : {final_score:.2f} / {TOTAL_POINTS:.2f}")
+    print("-----------------------")
     for note in notes:
         print(note)
     print(f"raw_score= {raw_percent:.2f}")
