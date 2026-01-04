@@ -30,17 +30,17 @@ submit:
 	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
 	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
 	@set +e; test_rc=0; \
-	(cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh $(ASSIGNMENT_NAME) | tee "$(ASSIGNMENT_DIR)/submission_report.txt"'); \
+	(cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh $(ASSIGNMENT_NAME) | tee "$(ASSIGNMENT_DIR)/submission_report.log"'); \
 	test_rc=$$?; set -e; \
 	if [ "$$test_rc" -ne 0 ]; then \
-	  echo "[submit] NOTE: Tests reported failures (rc=$$test_rc). See $(ASSIGNMENT_NAME)/submission_report.txt for details."; \
+	  echo "[submit] NOTE: Tests reported failures (rc=$$test_rc). See $(ASSIGNMENT_NAME)/submission_report.log for details."; \
 	fi
 	@# Capture verbose test output separately for debugging (not shown to user)
-	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.txt"'); set -e
+	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.log"'); set -e
 	@echo "[submit] computing hashes..."
 	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) | LC_ALL=C sort | sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
-	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.txt" >"$(ASSIGNMENT_DIR)/submission_report.txt.tmp"
-	@mv "$(ASSIGNMENT_DIR)/submission_report.txt.tmp" "$(ASSIGNMENT_DIR)/submission_report.txt"
+	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.log" >"$(ASSIGNMENT_DIR)/submission_report.log.tmp"
+	@mv "$(ASSIGNMENT_DIR)/submission_report.log.tmp" "$(ASSIGNMENT_DIR)/submission_report.log"
 	@rm -f "$(ASSIGNMENT_DIR)/hashes.tmp"
 	@zip_path="" ; name="" ; marker="$(LAST_ZIP_MARKER)"; \
 	if [ "${JUSTGRADE}" = "1" ]; then \
@@ -63,6 +63,6 @@ submit:
 	else \
 	  echo "[submit] Gradescope_Autograder_Template/test_submissions not found; skipping grader copy."; \
 	fi; \
-	if [ "${JUSTGRADE}" = "1" ]; then rm -f "$${zip_path}"; fi
-	@rm -f "$(ASSIGNMENT_DIR)/submission_report.txt"
+		if [ "${JUSTGRADE}" = "1" ]; then rm -f "$${zip_path}"; fi
+	@rm -f "$(ASSIGNMENT_DIR)/submission_report.log" "$(ASSIGNMENT_DIR)/submission_report_verbose.log"
 endif
