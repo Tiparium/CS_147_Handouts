@@ -117,9 +117,14 @@ nuke_docker:
 	fi; \
 	echo "Done. Note: other Docker images were not touched."
 
+clean_logs:
+	@rm -f .testing_selftest_attempt*.log
+	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
+	@echo "Removed local self-test logs."
+
 clean: clean_turnins
 	@$(MAKE) clean_docker
-	@rm -f .testing_selftest_attempt*.log
+	@$(MAKE) clean_logs
 	@echo "Cleaned turn-ins, docker image (if confirmed), and local self-test logs."
 
 student_name:

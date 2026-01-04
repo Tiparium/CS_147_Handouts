@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Per-assignment defaults (overridable via env: ASSIGNMENT_NAME, GRADER_SCRIPT, TOTAL_POINTS)
+# Per-assignment defaults (overridable via env: ASSIGNMENT_NAME, GRADER_SCRIPT)
 DEFAULT_ASSIGNMENT_NAME="Programming Assignment"
 DEFAULT_GRADER_SCRIPT="grade.py"
-DEFAULT_TOTAL_POINTS=100
+DEFAULT_TOTAL_POINTS=""
 LABNAME_FILE="/autograder/source/labname.cfg"
 
 ROOT="/autograder"
@@ -23,7 +23,11 @@ mkdir -p "$RES"
 
 echo "=== Autograder: $ASSIGNMENT_NAME ==="
 echo " grader     : $GRADER_SCRIPT"
-echo " total pts  : $TOTAL_POINTS_VAL"
+if [ -n "$TOTAL_POINTS_VAL" ]; then
+  echo " total pts  : $TOTAL_POINTS_VAL"
+else
+  echo " total pts  : (auto from grader)"
+fi
 echo " submission : $SUB"
 echo " results    : $RES"
 echo "-------------------------------------"
@@ -70,15 +74,17 @@ popd >/dev/null
 set -e
 
 # 3) parse → results.json (always try)
-echo "[4/4] parsing output -> results.json (max=$TOTAL_POINTS_VAL)"
+echo "[4/4] parsing output -> results.json"
 
 GEN_ARGS=(
   --in "$RES/grader_output.txt"
   --out "$RES/results.json"
   --assignment-name "$ASSIGNMENT_NAME"
 )
-GEN_ARGS+=(--total-points "$TOTAL_POINTS_VAL")
-FALLBACK_MAX="$TOTAL_POINTS_VAL"
+if [ -n "$TOTAL_POINTS_VAL" ]; then
+  GEN_ARGS+=(--total-points "$TOTAL_POINTS_VAL")
+fi
+FALLBACK_MAX="${TOTAL_POINTS_VAL:-0}"
 python3 "$SRC/gen_output.py" "${GEN_ARGS[@]}" \
   2>&1 | tee "$RES/parser.log" || true
 

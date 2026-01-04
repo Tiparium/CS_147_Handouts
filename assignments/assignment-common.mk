@@ -35,6 +35,8 @@ submit:
 	if [ "$$test_rc" -ne 0 ]; then \
 	  echo "[submit] NOTE: Tests reported failures (rc=$$test_rc). See $(ASSIGNMENT_NAME)/submission_report.txt for details."; \
 	fi
+	@# Capture verbose test output separately for debugging (not shown to user)
+	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.txt"'); set -e
 	@echo "[submit] computing hashes..."
 	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) | LC_ALL=C sort | sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
 	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.txt" >"$(ASSIGNMENT_DIR)/submission_report.txt.tmp"
