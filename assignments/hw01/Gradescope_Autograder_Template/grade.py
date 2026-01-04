@@ -55,7 +55,8 @@ def parse_hash_block(report_path: Path) -> Tuple[Dict[str, str], List[str]]:
             parts = stripped.split(None, 1)
             if len(parts) == 2 and all(c in "0123456789abcdef" for c in parts[0].lower()):
                 digest, path = parts
-                hashes[path.strip()] = digest
+                norm_path = path.strip().lstrip("./")
+                hashes[norm_path] = digest
             else:
                 # Reached non-hash lines; stop here
                 lines.append(stripped)
@@ -70,7 +71,7 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     out: Dict[str, str] = {}
     files = sorted(submission_root.rglob("*.v")) + sorted(submission_root.rglob("*.sv"))
     for path in files:
-        rel = str(path.relative_to(submission_root))
+        rel = str(path.relative_to(submission_root)).lstrip("./")
         with path.open("rb") as f:
             digest = hashlib.sha256(f.read()).hexdigest()
         out[rel] = digest
@@ -109,8 +110,8 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
       earned_points, total_points, notes, tests
     """
     notes: List[str] = []
-    report_path = submission_root / "submission_report.txt"
-    verbose_path = submission_root / "submission_report_verbose.txt"
+    report_path = submission_root / "submission_report.log"
+    verbose_path = submission_root / "submission_report_verbose.log"
 
     expected_hashes, lines = parse_hash_block(report_path)
     actual_hashes = recompute_hashes(submission_root)
@@ -119,9 +120,9 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
     if expected_hashes:
         if expected_hashes != actual_hashes:
             notes.append("Hash mismatch between report and submission files.")
-            return 0.0, notes, []
+            return 0.0, sum(SUB_POINTS.values()), notes, []
     else:
-        notes.append("No hash block found in submission_report.txt.")
+        notes.append("No hash block found in submission_report.log.")
 
     tests, test_notes = parse_test_summary(lines)
     notes.extend(test_notes)
@@ -147,11 +148,9 @@ def main() -> int:
     sub_root = Path.cwd()
 
     earned_points, total_points_calc, notes, tests = run_assignment_tests(sub_root)
-    # Total points should reflect config; fall back to computed if different.
-    total_pts = TOTAL_POINTS if TOTAL_POINTS else total_points_calc
-    if total_points_calc and total_pts != total_points_calc:
-        notes.append(f"[warning] TOTAL_POINTS ({total_pts}) differs from sum of sub_points ({total_points_calc}). Using {total_pts}.")
-    total_pts = total_pts or 1.0  # avoid division by zero
+    if not total_points_calc:
+        total_points_calc = TOTAL_POINTS
+    total_pts = total_points_calc or 1.0  # avoid division by zero
 
     raw_percent = (earned_points / total_pts) * 100.0
     raw_percent = clamp(raw_percent)
