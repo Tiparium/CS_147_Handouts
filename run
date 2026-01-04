@@ -87,26 +87,31 @@ run_with_spinner() {
 print_help() {
   cat <<'EOF'
 ./run commands:
-  ./run setup                  Build the Docker image (uses DOCKER_IMAGE_NAME override if set), then prompt for your name.
-  ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
-  ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
-  ./run help                   Show this help plus top-level make targets.
-  ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
-  ./run submit <assignment>    Run the assignment submit flow.
-  ./run wave_test              Generate VCD waveforms for the .testing mux examples.
-  ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
-  ./run student_name           View/update the recorded student name.
-  ./run clean_turnins          Delete generated submission archives (prompts).
-  ./run clean_docker           Remove toolchain/autograder images (prompts; optional config cleanup).
-  ./run clean                  Run all clean_* targets and remove local self-test logs.
+  [Setup & Shell]
+    ./run setup                  Build the Docker image (uses DOCKER_IMAGE_NAME override if set), then prompt for your name.
+    ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
+    ./run help                   Show this help.
+    ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
+
+  [Tests & Submission]
+    ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
+    ./run submit <assignment>    Run the assignment submit flow (runs tests, zips, optional host autograder).
+    ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
+    ./run wave_test              Generate VCD waveforms for the .testing mux examples.
+
+  [Student Info]
+    ./run student_name           View/update the recorded student name.
+
+  [Cleanup]
+    ./run clean logs             Remove local self-test logs (and other clean target items).
+    ./run clean docker           Remove toolchain/autograder images (prompts; optional config cleanup).
+    ./run clean turnins          Delete generated submission archives (prompts).
+    ./run clean all              Run all clean_* targets (default if no subcommand).
 EOF
 }
 
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "--help-only" ]; then
   print_help
-  if [ "${1:-}" != "--help-only" ] && [ -z "${RUN_HELP_SKIP_MAKE:-}" ]; then
-    RUN_HELP_SKIP_RUN=1 make -s -C "$REPO_ROOT" help
-  fi
   exit 0
 fi
 
@@ -182,7 +187,20 @@ case "${1:-}" in
     (cd "$grader_dir" && make clean >/dev/null 2>&1 || true)
     exit $grade_rc
     ;;
-  clean_turnins|clean_docker|clean|student_name|wave_test)
+  clean)
+    shift
+    clean_target="${1:-all}"
+    case "$clean_target" in
+      logs)      make_target="clean_logs" ;;
+      docker)    make_target="clean_docker" ;;
+      turnins)   make_target="clean_turnins" ;;
+      all)       make_target="clean" ;;
+      *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
+    esac
+    shift || true
+    exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$make_target" "$@"
+    ;;
+  student_name|wave_test)
     target="$1"; shift
     exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;

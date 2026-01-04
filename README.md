@@ -45,10 +45,9 @@ The wrapper mounts the whole repo at `/repo` and mirrors your current subdirecto
 - `./run submit <assignment>` — run the assignment’s submit flow
 - `./run wave_test` — generate VCD waveforms for the .testing mux examples
 - `./run student_name` — view/update your recorded student name
-- `./run clean_turnins` — delete generated submission archives (prompts)
-- `./run clean_docker` — remove local Docker images (toolchain + autograder base) with confirmation; optional config cleanup
-- `./run clean` — run all clean_* targets and remove local self-test logs
+- `./run clean logs|docker|turnins|all` — targeted cleanup (logs = self-test logs; docker = toolchain/autograder images; turnins = generated submission zips; all = full clean; prompts as applicable)
 - Host-only: `make nuke_docker` — forcibly remove the toolchain and autograder images (cache) with confirmations; do not run via `./run`
+- Reminder: always invoke `make` targets through `./run …` (e.g., `./run make test`) to stay inside the container environment.
 
 ## Notes
 - Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.

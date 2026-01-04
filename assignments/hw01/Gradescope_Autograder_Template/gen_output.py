@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 # Per-assignment defaults (CLI flags override these).
 CONFIG = {
     "assignment_name": "Programming Assignment",
-    "total_points": 100.0,
+    "total_points": 30.0,
 }
 
 
@@ -30,6 +30,16 @@ def parse_scores(text: str) -> Tuple[Optional[float], Optional[float], Optional[
     return raw, curved, final
 
 
+def parse_total_points(text: str) -> Optional[float]:
+    m = re.search(r"Total points:\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m:
+        return float(m.group(1))
+    m2 = re.search(r"total_points\s*=\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m2:
+        return float(m2.group(1))
+    return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="in_path", required=True)
@@ -43,8 +53,8 @@ def main() -> None:
 
     text = in_path.read_text(errors="ignore") if in_path.is_file() else ""
     raw, curved, final = parse_scores(text)
-
-    total_points = float(args.total_points)
+    parsed_total = parse_total_points(text)
+    total_points = float(parsed_total if parsed_total is not None else args.total_points)
 
     raw = raw if raw is not None else 0.0
     curved = curved if curved is not None else raw
