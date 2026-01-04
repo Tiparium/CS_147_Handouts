@@ -48,6 +48,14 @@ TTY_FLAGS=()
 if [ -t 0 ] && [ -t 1 ]; then
   TTY_FLAGS=(-it)
 fi
+TTY_OPTS=()
+if [ ${#TTY_FLAGS[@]} -gt 0 ]; then
+  TTY_OPTS=("${TTY_FLAGS[@]}")
+fi
+SOCK_OPTS=()
+if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
+  SOCK_OPTS=("${DOCKER_SOCK_VOLUME[@]}")
+fi
 SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
 
 run_with_spinner() {
@@ -117,12 +125,12 @@ fi
 
 if [ "${1:-}" = "verilog_checker" ]; then
   shift
-  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
+  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
 fi
 
 if [ "${1:-}" = "test" ]; then
   shift
-  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
+  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
 fi
 
 case "${1:-}" in
@@ -154,7 +162,7 @@ case "${1:-}" in
       set -- "$assignment_arg"
     fi
     # Run submit inside the container first.
-    docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
+    docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
     rc=$?
     if [ $rc -ne 0 ]; then
       exit $rc
@@ -198,11 +206,11 @@ case "${1:-}" in
       *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
     esac
     shift || true
-    exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$make_target" "$@"
+    exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$make_target" "$@"
     ;;
   student_name|wave_test)
     target="$1"; shift
-    exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" make "$target" "$@"
+    exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;
 esac
 

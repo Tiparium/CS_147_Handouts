@@ -116,10 +116,10 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
     expected_hashes, lines = parse_hash_block(report_path)
     actual_hashes = recompute_hashes(submission_root)
 
-    # Hash check
+    # Hash check (warn on mismatch; continue grading so we can see why)
     if expected_hashes:
         if expected_hashes != actual_hashes:
-            notes.append("Hash mismatch between report and submission files.")
+            notes.append("Hash mismatch between report and submission files (continuing with 0 points).")
             return 0.0, sum(SUB_POINTS.values()), notes, []
     else:
         notes.append("No hash block found in submission_report.log.")
