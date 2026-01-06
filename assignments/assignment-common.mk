@@ -38,7 +38,12 @@ submit:
 	@# Capture verbose test output separately for debugging (not shown to user)
 	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.log"'); set -e
 	@echo "[submit] computing hashes..."
-	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) | LC_ALL=C sort | sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
+	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
+	@if [ "${AG_HASH_VERBOSE}" = "1" ]; then \
+	  echo "================ HASH REPORT (pre-zip) ================"; \
+	  cat "$(ASSIGNMENT_DIR)/hashes.tmp"; \
+	  echo "======================================================="; \
+	fi
 	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.log" >"$(ASSIGNMENT_DIR)/submission_report.log.tmp"
 	@mv "$(ASSIGNMENT_DIR)/submission_report.log.tmp" "$(ASSIGNMENT_DIR)/submission_report.log"
 	@rm -f "$(ASSIGNMENT_DIR)/hashes.tmp"

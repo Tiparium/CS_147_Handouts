@@ -18,6 +18,9 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+VERBOSE = os.environ.get("AG_VERBOSE", os.environ.get("VERBOSE", "0")) not in ("0", "", "false", "False", None)
+HASH_VERBOSE = os.environ.get("AG_HASH_VERBOSE", "0") not in ("0", "", "false", "False", None)
+
 CONFIG = {
     "clamp_low": 0.0,
     "clamp_high": 100.0,
@@ -110,18 +113,41 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
       earned_points, total_points, notes, tests
     """
     notes: List[str] = []
+    hash_status = "UNKNOWN"
     report_path = submission_root / "submission_report.log"
     verbose_path = submission_root / "submission_report_verbose.log"
 
     expected_hashes, lines = parse_hash_block(report_path)
     actual_hashes = recompute_hashes(submission_root)
 
+    def hash_report(title: str, mapping: Dict[str, str]) -> List[str]:
+        rep: List[str] = []
+        rep.append(f"================ {title} ================")
+        if not mapping:
+            rep.append("(no entries)")
+        else:
+            for path in sorted(mapping.keys()):
+                rep.append(f"{path}: {mapping[path]}")
+            joined = "\n".join(f"{k}:{mapping[k]}" for k in sorted(mapping.keys()))
+            summary = hashlib.sha256(joined.encode("utf-8")).hexdigest() if joined else "n/a"
+            rep.append(f"Summary hash: {summary}")
+        rep.append("=" * len(rep[0]))
+        return rep
+
     # Hash check (warn on mismatch; continue grading so we can see why)
     if expected_hashes:
         if expected_hashes != actual_hashes:
+            hash_status = "MISMATCH"
             notes.append("Hash mismatch between report and submission files (continuing with 0 points).")
+            notes.insert(0, f"Hash status: {hash_status}")
+            if VERBOSE or HASH_VERBOSE:
+                notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
+                notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
             return 0.0, sum(SUB_POINTS.values()), notes, []
+        else:
+            hash_status = "OK"
     else:
+        hash_status = "MISSING"
         notes.append("No hash block found in submission_report.log.")
 
     tests, test_notes = parse_test_summary(lines)
@@ -130,6 +156,12 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
     if verbose_path.exists():
         notes.append("[verbose test log]")
         notes.extend(verbose_path.read_text().splitlines())
+
+    # Surface hash status prominently
+    notes.insert(0, f"Hash status: {hash_status}")
+    if VERBOSE or HASH_VERBOSE:
+        notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
+        notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
 
     total_points = sum(t.get("max_score", 0.0) for t in tests)
     earned = sum(t.get("score", 0.0) for t in tests)
