@@ -11,7 +11,8 @@ RESULTS_DIR="${RESULTS_DIR:-local_results}"
 SUBMISSIONS_ROOT="${SUBMISSIONS_ROOT:-test_submissions}"
 cleanup_dir=""
 progress_pid=""
-VERBOSE="${AG_VERBOSE:-0}"
+VERBOSE="${VERBOSE:-${AG_VERBOSE:-0}}"
+HASH_VERBOSE="${AG_HASH_VERBOSE:-0}"
 DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
 
 usage() {
@@ -142,7 +143,9 @@ case "$cmd" in
       -v "$PWD":/autograder/source \
       -v "$submission_abs":/autograder/submission \
       -v "$PWD/$RESULTS_DIR":/autograder/results \
-      -e VERBOSE=0 \
+      -e VERBOSE="$VERBOSE" \
+      -e AG_VERBOSE="$VERBOSE" \
+      -e AG_HASH_VERBOSE="$HASH_VERBOSE" \
       -e PYTHONUNBUFFERED=1 \
       "$IMAGE_TAG" \
       /bin/bash -lc "cd /autograder/source && ./run_autograder" \
@@ -168,6 +171,7 @@ case "$cmd" in
       echo "================ AUTOGRADER SUMMARY ================"
       docker run --rm $DOCKER_PLATFORM_FLAG \
         -e AG_VERBOSE="$VERBOSE" \
+        -e AG_HASH_VERBOSE="$HASH_VERBOSE" \
         -v "$PWD":/autograder/source \
         -v "$submission_abs":/autograder/submission \
         -v "$results_dir_path":/autograder/results \
@@ -179,7 +183,21 @@ case "$cmd" in
             python3 - <<'"'"'PY'"'"'
 import json, os, pathlib
 verbose = int(os.environ.get("AG_VERBOSE", "0"))
+hash_verbose = int(os.environ.get("AG_HASH_VERBOSE", "0"))
 path = pathlib.Path("results.json")
+hash_line = None
+hash_lines_full = []
+try:
+    hpath = pathlib.Path("grader_output.txt")
+    if hpath.is_file():
+        lines = hpath.read_text().splitlines()
+        hash_lines_full = [ln for ln in lines if ln.startswith("HASH REPORT") or ln.startswith("=") or ":" in ln or ln.startswith("Summary hash")]
+        for ln in lines:
+            if ln.startswith("Hash status:"):
+                hash_line = ln.strip()
+                break
+except Exception:
+    pass
 try:
     data = json.loads(path.read_text())
     score = data.get("score")
@@ -190,9 +208,22 @@ try:
     total_vals = [t.get("max_score") for t in tests if isinstance(t, dict) and t.get("max_score") is not None]
     total = sum(total_vals) if total_vals else None
     final_line = f"Final score: {score}/{total}" if total is not None else f"Final score: {score}"
+    if hash_line:
+        print(hash_line)
+        if "MISMATCH" in hash_line.upper():
+            print("!!! HASH MISMATCH DETECTED — SCORE FORCED TO 0 !!!")
+        elif hash_verbose:
+            print("(hashes matched)")
+    elif hash_verbose:
+        print("Hash status: (not reported)")
     print("***** FINAL SCORE *****")
     print(final_line)
     print("***********************")
+    if hash_verbose and hash_lines_full:
+        print("----- HASH REPORT (from grader_output) -----")
+        for ln in hash_lines_full:
+            print(ln)
+        print("--------------------------------------------")
     if verbose:
         if output:
             print("[grader_output]")
