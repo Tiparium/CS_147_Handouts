@@ -3,15 +3,15 @@
 ## Setting up the work environment
 
 Dependencies:
-- Homebrew Package Manager (Mac only) — required for installing make, useful for installing other packages.
-- Apt Package Manager (built into Linux, what you’ll install dependencies with in WSL).
-- Docker Desktop (required for all platforms).
-- Git (includes Bash as optional additional installation. Do that.).
+- [Homebrew Package Manager](https://brew.sh/) (Mac only) — required for installing make, useful for installing other packages.
+- Apt Package Manager (Linux / Windows only. Included in Linux / WSL by default).
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (required for all platforms).
+- [Git](https://git-scm.com/install/) (includes Bash as optional additional installation. Do that.).
 - Make.
 - Bash (preinstalled on macOS and most Linux distros; Windows gets via Git install).
-- Visual Studio Code.
-- Wavetrace (search for “wavetrace” in VSCode extensions after VSCode is installed).
-- Python3 (recommended).
+- [Visual Studio Code](https://code.visualstudio.com/).
+- [Wavetrace](https://marketplace.visualstudio.com/items?itemName=wavetrace.wavetrace) (search for “wavetrace” in VSCode extensions after VSCode is installed).
+- [Python3](https://www.python.org/downloads/) (recommended).
 
 Important Notes:
 - If any changes need to be made to the repository, an alert will be sent to all students. Recover the changes with `git pull`.
