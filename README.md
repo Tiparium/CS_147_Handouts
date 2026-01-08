@@ -7,7 +7,7 @@ Dependencies:
 - Apt Package Manager (Linux / Windows only. Included in Linux / WSL by default).
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (required for all platforms).
 - [Git](https://git-scm.com/install/) (includes Bash as optional additional installation. Do that.).
-- Make.
+- Make (Will be installed via package manager. Don't worry about doing this manually).
 - Bash (preinstalled on macOS and most Linux distros; Windows gets via Git install).
 - [Visual Studio Code](https://code.visualstudio.com/).
 - [Wavetrace](https://marketplace.visualstudio.com/items?itemName=wavetrace.wavetrace) (search for “wavetrace” in VSCode extensions after VSCode is installed).
