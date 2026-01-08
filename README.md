@@ -1,56 +1,99 @@
-# CS 147 Docker-Based Verilog Workflow
+# CS 147 Handouts — Setup Guide
 
-This repo holds CS 147 handouts and homework. Tooling runs inside Docker so students get a consistent Verilog environment on macOS, Windows, and Linux without installing Icarus locally.
+## Setting up the work environment
 
-## Prerequisites
-- Install Docker Desktop (or Docker Engine on Linux).
-- Clone this repository: `git clone https://github.com/Tiparium/CS_147_Handouts.git`
+Dependencies:
+- Homebrew Package Manager (Mac only) — required for installing make, useful for installing other packages.
+- Apt Package Manager (built into Linux, what you’ll install dependencies with in WSL).
+- Docker Desktop (required for all platforms).
+- Git (includes Bash as optional additional installation. Do that.).
+- Make.
+- Bash (preinstalled on macOS and most Linux distros; Windows gets via Git install).
+- Visual Studio Code.
+- Wavetrace (search for “wavetrace” in VSCode extensions after VSCode is installed).
+- Python3 (recommended).
 
-## One-time setup
+Important Notes:
+- If any changes need to be made to the repository, an alert will be sent to all students. Recover the changes with `git pull`.
+- If any changes need to be made to the docker containers used in this project, do the above, then re-run `./run setup`. If this fails for any reason, try running `make clean_docker`, and re-run. If this fails, contact the instructor.
+- If the installation fails during `./run setup`, run `git pull` and retry.
+
+### Setup (Windows)
+Set up WSL (You can skip this if you have already set up WSL)
+1. Open Powershell as Administrator.
+2. Run: `wsl --install`
+3. Reboot (Mandatory).
+
+Open Ubuntu app (Not WSL, Not Ubuntu on Windows).
+- NOTE: The Ubuntu app is the terminal you will use to interact with all assignments.
+- Assume going forwards that any time you are entering a command, it is in the Ubuntu app.
+- Using Powershell, terminal, or Bash may have mixed results.
+
+Enable Docker integration with WSL.
+- Install Docker Desktop if you haven’t already.
+- In Docker Desktop, navigate to Settings, Resources, WSL integration.
+- Enable.
+
+From here, follow the MacOS / Linux setup instructions, using the Ubuntu terminal.
+
+### Setup (MacOS / Linux)
+- Ensure you have at minimum 3 Gigabytes free storage.
+- Install above dependencies if you haven’t already.
+- When installing Docker Desktop, do not use custom installation. Docker container intercommunication assumes the default Docker Desktop path. Custom installations WILL break things.
+
+Run the following in terminal:
+
+Linux / WSL:
 ```bash
-cd CS_147_Handouts
-./run setup
+sudo apt update
+sudo apt install -y \
+git \
+make \
+python3 \
+python3-pip \
+ca-certificates \
+curl \
+zip \
+unzip \
+tree
 ```
-You’ll be prompted for your name (used in submission zips). This builds the `cs147-verilog-toolchain` image (or use `DOCKER_IMAGE_NAME` to override).
 
-## Daily usage
-- Run any command through the wrapper from anywhere in the repo:
-  - `./run make test`
-  - `./run iverilog -g2012 -o sim *.v`
-  - `./run shell` for an interactive container shell
-  - `./run test hw1 [hw1_2]` to run assignment benches (quiet summary by default; add `-v` for full logs; leading zero optional)
-  - `./run verilog_checker <assignment|path>` to run the Java Vcheck tool on assignments or specific files
-- From inside an assignment subfolder, prefix with `../run`:
-  - `cd assignments/hw02`
-  - `../../run make test`
+MacOS:
+```bash
+brew update
+brew install \
+git \
+make \
+python \
+ca-certificates \
+curl \
+zip \
+unzip \
+tree
+```
 
-The wrapper mounts the whole repo at `/repo` and mirrors your current subdirectory so relative paths work as expected. Waveforms (`.vcd`) are written to the host and can be opened with host-side viewers or VS Code extensions.
+Clone the Handouts Repo:
+```bash
+git clone https://github.com/Tiparium/CS_147_Handouts.git
+```
+Or, if students have ssh configured:
+```bash
+git clone git@github.com:Tiparium/CS_147_Handouts.git
+```
 
-## Submitting work (scaffolding)
-- Assignments live in `assignments/hw01` … `hw06`, `lab`, and `project`.
-- From repo root: `./run submit hw01` (or `hw02`, `lab`, `project`, etc.).
-- Submit runs `./run test` first (verilog checker + benches), prepends file hashes to a `submission_report.txt`, and zips the assignment into `generated_turnins/<assignment>/` (unless `-justgrade` is used). Files are named `<assignment>_<student>_submission<N>.zip` with `N` incrementing per submission.
-- A copy of the zip is also placed in the assignment’s `Gradescope_Autograder_Template/test_submissions/` for you to run the autograder on the host (`./run grade test_submissions/<zip>` from that folder). `-nograde`/`-justgrade` simply control whether the student zip is produced; no autograder is run inside `./run submit`.
-- Even after the local autograder run, you must still upload the generated submission zip to Gradescope.
-- The local score is what you should expect there.
-- This is only a local pre-check.
-- Submit requires your name in `config.json`. If it’s missing, you’ll be asked to run `./run setup` (builds image and records your name) or `./run student_name` to set it.
+Run `./run setup`
+- This will install the verilog toolchain docker image. Note that this step may take some time, and should not be done on a mobile hotspot, as some fairly large files will be downloaded. This includes a self test script to ensure that all programs inside the docker container are configured and running correctly.
+- Includes a warning to contact the professor or myself if the docker self test fails.
 
-## Common commands (root)
-- `./run setup` — build/pull the toolchain image, prompt for student name, run self-test
-- `./run shell` — interactive shell inside the container at your current repo subdir
-- `./run <cmd>` — run any command inside the container (e.g., `make test`, `iverilog …`)
-- `./run test <hw> [sub]` — run testbenches for an assignment (quiet PASS/FAIL summary; add `-v` for full logs; `hw1` or `hw01` accepted)
-- `./run verilog_checker <assignment|path>` — run Vcheck on an assignment (recursive) or a specific `.v` file / non-recursive directory
-- `./run submit <assignment>` — run the assignment’s submit flow
-- `./run wave_test` — generate VCD waveforms for the .testing mux examples
-- `./run student_name` — view/update your recorded student name
-- `./run clean logs|docker|turnins|all` — targeted cleanup (logs = self-test logs; docker = toolchain/autograder images; turnins = generated submission zips; all = full clean; prompts as applicable)
-- Host-only: `make nuke_docker` — forcibly remove the toolchain and autograder images (cache) with confirmations; do not run via `./run`
-- Reminder: always invoke `make` targets through `./run …` (e.g., `./run make test`) to stay inside the container environment.
+Install VSCode, if you haven’t already, and install Wavetrace into VSCode.
 
-## Notes
-- Your name is stored in `config.json` in the repo root (ignored by git). Use `make student_name` to view/change it; previous names are retained.
-- To rebuild from scratch on your machine: run `make clean_docker` (on the host, not via `./run`) to remove the local image; it can optionally clear your name from `config.json`.
-- The Docker image only contains the toolchain (Icarus Verilog, make, git, bash, ca-certificates); assignments stay in your working copy.
-- If you see “image not found,” run `./run setup` to (re)build locally.
+### Testing the wave visualizer
+Run `./run wave_test` at project root to build the wave files.
+
+Locate `mux2_continuous.vcd` and `mux2_rocedural.vcd` in the file tree, open both. Each should look like an empty timeline, with a button in the lower right corner labeled Add Signals.
+
+Click the Add Signals button, and add `a`, `b`, `y`, and `sel` to the waveform. Adjust the zoom of the waveform.
+
+If you see a waveform identical to the example (width may vary based on your zoom level), then your environment is fully set up.
+
+If you do not see the above waveform, ensure you have Wavetrace installed, and try again.
