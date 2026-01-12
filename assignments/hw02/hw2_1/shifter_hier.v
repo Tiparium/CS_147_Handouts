@@ -1,31 +1,36 @@
-module shifter_hier(In, Cnt, Op, Out);
+/*
+    CS/ECE 552 Spring '22
+    Homework #2, Problem 1
+    
+    The wrapper module around the barrel shifter to combine it with 
+    the clock and reset.
+ */
+module shifter_hier(In, ShAmt, Oper, Out);
 
-   input [15:0] In;
-   input [3:0]  Cnt;
-   input [1:0]  Op;
-   output [15:0] Out;
+    // declare constant for size of inputs, outputs, and # bits to shift
+    parameter OPERAND_WIDTH  = 16;
+    parameter SHAMT_WIDTH    =  4;
+    parameter NUM_OPERATIONS =  2;   
 
-   wire clk;
-   wire rst;
-   wire err;
+    input  [OPERAND_WIDTH -1:0] In   ; 
+    input  [SHAMT_WIDTH   -1:0] ShAmt; 
+    input  [NUM_OPERATIONS-1:0] Oper ; 
+    output [OPERAND_WIDTH -1:0] Out  ; 
 
-   assign err = 1'b0;
- 
-   clkrst c0(
-             // Outputs
-             .clk                       (clk),
-             .rst                       (rst),
-             // Inputs
-             .err                       (err)
-            );
+    // Signals for clkrst module
+    wire clk;
+    wire rst;
+    wire err;
 
-   shifter s0(
-              // Outputs
-              .Out                      (Out),
-              // Inputs
-              .In                       (In),
-              .Cnt                      (Cnt),
-              .Op                       (Op)
-             );
+    assign err = 1'b0;
+   
+    shifter #(.OPERAND_WIDTH(OPERAND_WIDTH),
+              .SHAMT_WIDTH(SHAMT_WIDTH),
+              .NUM_OPERATIONS(NUM_OPERATIONS)) 
+            DUT (.In(In), .ShAmt(ShAmt), .Oper(Oper), .Out(Out));
+
+    clkrst c0(.clk(clk),
+              .rst(rst),
+              .err(err));
    
 endmodule // shifter_hier
