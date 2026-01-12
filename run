@@ -155,9 +155,13 @@ case "${1:-}" in
       shift
     done
     if [ -z "$assignment_arg" ]; then
-      echo "[submit] assignment name required (e.g., hw01)" >&2
+      echo "[submit] assignment name required (e.g., hw01 or hw1)" >&2
       exit 1
     fi
+    # Normalize hw number (accept hw1 or hw01)
+    case "$assignment_arg" in
+      hw[0-9]) assignment_arg=$(printf "hw%02d" "${assignment_arg#hw}") ;;
+    esac
     if [ ${#extra_make_args[@]} -gt 0 ]; then
       set -- "$assignment_arg" "${extra_make_args[@]}"
     else

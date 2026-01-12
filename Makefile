@@ -40,9 +40,11 @@ wave_test:
 clean_turnins:
 	@echo -n "This will wipe all existing generated turn in files. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
-	  case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
-	  find generated_turnins -type f ! -name '.gitkeep' ! -name 'submissions.txt' -delete ; \
-	  echo "Generated turn-in files removed."
+	  case $$ans in y|Y) \
+	    find generated_turnins -type f ! -name '.gitkeep' ! -name 'submissions.txt' -delete ; \
+	    echo "Generated turn-in files removed." ;; \
+	    *) echo "Skipped cleaning turn-ins."; ;; \
+	  esac
 
 clean_docker:
 	@if ! command -v docker >/dev/null 2>&1; then \
@@ -51,24 +53,26 @@ clean_docker:
 	fi
 	@echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
-	  case $$ans in y|Y) ;; *) echo "Aborted."; exit 1;; esac; \
-	  for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
-	    if docker image inspect "$$img" >/dev/null 2>&1; then \
-	      docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
-	    else \
-	      echo "Image $$img not found."; \
-	    fi; \
-	  done; \
-	  echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
-		  read ans2 ; \
-		  case $$ans2 in \
-		    y|Y) if command -v python3 >/dev/null 2>&1; then \
-		            python3 "$(CONFIG_SCRIPT)" --config "$(CONFIG_FILE)" clear-student && echo "Cleared student info."; \
-		          else \
-		            echo "python3 not found; skipping personal info cleanup."; \
-		          fi ;; \
-		    *) echo "Personal info preserved."; ;; \
-		  esac
+	  case $$ans in y|Y) \
+	    for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
+	      if docker image inspect "$$img" >/dev/null 2>&1; then \
+	        docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
+	      else \
+	        echo "Image $$img not found."; \
+	      fi; \
+	    done; \
+	    echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
+	    read ans2 ; \
+	    case $$ans2 in \
+	      y|Y) if command -v python3 >/dev/null 2>&1; then \
+	              python3 "$(CONFIG_SCRIPT)" --config "$(CONFIG_FILE)" clear-student && echo "Cleared student info."; \
+	            else \
+	              echo "python3 not found; skipping personal info cleanup."; \
+	            fi ;; \
+	      *) echo "Personal info preserved."; ;; \
+	    esac ;; \
+	    *) echo "Skipped cleaning Docker images."; ;; \
+	  esac
 
 nuke_docker:
 	@if ! command -v docker >/dev/null 2>&1; then \
@@ -122,10 +126,57 @@ clean_logs:
 	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
 	@echo "Removed local self-test logs."
 
-clean: clean_turnins
-	@$(MAKE) clean_docker
-	@$(MAKE) clean_logs
-	@echo "Cleaned turn-ins, docker image (if confirmed), and local self-test logs."
+CLEAN_STEPS := clean_turnins clean_docker clean_logs
+
+clean:
+	@cleaned=""; skipped=""; \
+	for tgt in $(CLEAN_STEPS); do \
+		case "$$tgt" in \
+		  clean_turnins) \
+		    echo -n "Clean turn-ins? [y/N] " ; read ans ; \
+		    case $$ans in \
+		      y|Y) find generated_turnins -type f ! -name '.gitkeep' ! -name 'submissions.txt' -delete ; \
+		           echo "Turn-ins cleaned."; cleaned="$$cleaned $$tgt" ;; \
+		      *) echo "Turn-ins skipped."; skipped="$$skipped $$tgt" ;; \
+		    esac ;; \
+		  clean_docker) \
+		    if ! command -v docker >/dev/null 2>&1; then \
+		      echo "Docker not found; skipping Docker clean."; skipped="$$skipped $$tgt" ; \
+		    else \
+		      echo -n "Clean Docker images ($(DOCKER_IMAGE_NAME), $(AUTOGRADER_IMAGE_NAME))? [y/N] " ; read ans ; \
+		      case $$ans in \
+		        y|Y) for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
+			          if docker image inspect "$$img" >/dev/null 2>&1; then \
+			            docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
+			          else \
+			            echo "Image $$img not found."; \
+			          fi; \
+			        done; \
+			        echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; read ans2 ; \
+			        case $$ans2 in \
+			          y|Y) if command -v python3 >/dev/null 2>&1; then \
+			                  python3 "$(CONFIG_SCRIPT)" --config "$(CONFIG_FILE)" clear-student && echo "Cleared student info."; \
+			                else \
+			                  echo "python3 not found; skipping personal info cleanup."; \
+			                fi ;; \
+			          *) echo "Personal info preserved."; ;; \
+			        esac; \
+			        cleaned="$$cleaned $$tgt" ;; \
+		        *) echo "Docker clean skipped."; skipped="$$skipped $$tgt" ;; \
+		      esac; \
+		    fi ;; \
+		  clean_logs) \
+		    echo -n "Clean log files? [y/N] " ; read ans ; \
+		    case $$ans in \
+		      y|Y) rm -f .testing_selftest_attempt*.log assignments/.testing/selftest_logs/.testing_selftest_attempt*.log; \
+		           echo "Logs cleaned."; cleaned="$$cleaned $$tgt" ;; \
+		      *) echo "Logs skipped."; skipped="$$skipped $$tgt" ;; \
+		    esac ;; \
+		esac; \
+	done; \
+	echo "Clean summary:"; \
+	echo "  cleaned: $$cleaned"; \
+	echo "  skipped: $$skipped"
 
 student_name:
 	@./run python3 student_config.py --config /repo/config.json summary
