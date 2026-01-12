@@ -1,10 +1,14 @@
-// TODO: Implement 1-bit 2:1 mux using only nand/nor/not primitives.
+/*
+    CS/ECE 552 Spring '22
+    Homework #1, Problem 1
 
-module mux2_1 (
-    input  InA,
-    input  InB,
-    input  S,
-    output Out
-);
-    // TODO
+    2-1 mux template
+*/
+module mux2_1(out, inA, inB, s);
+    output  out;
+    input   inA, inB;
+    input   s;
+
+    // YOUR CODE HERE
+    
 endmodule

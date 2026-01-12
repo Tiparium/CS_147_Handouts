@@ -1,12 +1,14 @@
-// TODO: Build 4:1 mux hierarchically from mux2_1.
+/*
+    CS/ECE 552 Spring '22
+    Homework #1, Problem 1
 
-module mux4_1 (
-    input  InA,
-    input  InB,
-    input  InC,
-    input  InD,
-    input  [1:0] S,
-    output Out
-);
-    // TODO
+    4-1 mux template
+*/
+module mux4_1(out, inA, inB, inC, inD, s);
+    output       out;
+    input        inA, inB, inC, inD;
+    input [1:0]  s;
+
+    // YOUR CODE HERE
+      
 endmodule
