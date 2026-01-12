@@ -1,9 +1,18 @@
-/* $Author: karu $ */
-/* $LastChangedDate: 2009-03-04 23:09:45 -0600 (Wed, 04 Mar 2009) $ */
-/* $Rev: 45 $ */
-// D-flipflop
+/*
+   CS/ECE 552, Spring '22
+   Homework #3, Problem #2
+  
+   This module creates a 1-bit D-flipflop (DFF).
 
-module dff (q, d, clk, rst);
+   YOU SHALL NOT EDIT THIS FILE. ANY CHANGES TO THIS FILE WILL
+   RESULT IN ZERO FOR THIS PROBLEM.
+*/
+module dff (
+            // Output
+            q,
+            // Inputs
+            d, clk, rst
+            );
 
     output         q;
     input          d;
@@ -19,4 +28,3 @@ module dff (q, d, clk, rst);
     end
 
 endmodule
-// DUMMY LINE FOR REV CONTROL :0:
