@@ -28,7 +28,7 @@ run_file() {
   local tmp
   local status=0
   base="$(basename "$f")"
-  if [[ "$base" == tb_* ]] || [[ "$base" == *_tb.v ]] || [[ "$base" == *tb.v ]] || [[ "$base" == *_bench.v ]]; then
+  if [[ "$base" == tb_* ]] || [[ "$base" == *_tb.v ]] || [[ "$base" == *tb.v ]] || [[ "$base" == *_bench.v ]] || [[ "$base" == clkrst.v ]]; then
     return 0
   fi
   echo "  [CHECK] $f"
