@@ -99,11 +99,13 @@ for subdir in "${subdirs[@]}"; do
 
     [ "$VERBOSE" -eq 1 ] && echo "[CMD] vvp $out"
     if [ "$VERBOSE" -eq 1 ]; then
-      vvp "$out" 2>&1 | tee -a "$log"
+      vvp "$out" <<<"finish" 2>&1 | tee -a "$log"
+      vvp_status="${PIPESTATUS[0]}"
     else
-      vvp "$out" >>"$log" 2>&1
+      vvp "$out" <<<"finish" >>"$log" 2>&1
+      vvp_status=$?
     fi
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+    if [ "$vvp_status" -ne 0 ]; then
       sub_errors=$((sub_errors + 1))
       [ "$VERBOSE" -eq 1 ] && cat "$log"
       continue
