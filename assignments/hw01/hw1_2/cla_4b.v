@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 2
-    
-    a 4-bit CLA module
+    CS 147 Spring 26
+    Homework #1, problem 2
+
+    4-bit carry-lookahead adder.
 */
 module cla_4b(sum, c_out, a, b, c_in);
 

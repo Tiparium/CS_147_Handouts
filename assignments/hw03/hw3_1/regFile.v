@@ -1,11 +1,8 @@
 /*
-   CS 147, Spring 26
-   Homework #3, Problem #1
-  
-   This module creates a 16-bit register.  It has 1 write port, 2 read
-   ports, 3 register select inputs, a write enable, a reset, and a clock
-   input.  All register state changes occur on the rising edge of the
-   clock. 
+    CS 147 Spring 26
+    Homework #3, problem 1
+
+    8x16 register file with 2 read ports and 1 write port.
 */
 // Shared via symlink between assignments/hw03/hw3_1/regFile.v and assignments/hw03/hw3_2/regFile.v.
 // WARNING: This file can be edited from either path, but DO NOT move or duplicate this file.

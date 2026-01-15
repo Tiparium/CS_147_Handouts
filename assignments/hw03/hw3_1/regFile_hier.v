@@ -1,11 +1,8 @@
 /*
-   CS/ECE 552, Spring '22
-   Homework #3, Problem #1
-  
-   Wrapper module around 8x16b register file.
+    CS 147 Spring 26
+    Homework #3, problem 1
 
-   YOU SHALL NOT EDIT THIS FILE. ANY CHANGES TO THIS FILE WILL
-   RESULT IN ZERO FOR THIS PROBLEM.
+    Wrapper around the register file for testing.
 */
 module regFile_hier (
                      // Outputs

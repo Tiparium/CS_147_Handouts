@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '20
-    Homework #1, Problem 2
-    
-    a 1-bit full adder
+    CS 147 Spring 26
+    Homework #1, problem 2
+
+    1-bit full adder.
 */
 module fullAdder_1b(s, c_out, a, b, c_in);
     output s;

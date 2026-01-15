@@ -1,10 +1,9 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #2, Problem 1
-    
-    The wrapper module around the barrel shifter to combine it with 
-    the clock and reset.
- */
+    CS 147 Spring 26
+    Homework #2, problem 1
+
+    Wrapper around the shifter for testing.
+*/
 module shifter_hier(In, ShAmt, Oper, Out);
 
     // declare constant for size of inputs, outputs, and # bits to shift

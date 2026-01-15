@@ -1,3 +1,9 @@
+/*
+    CS 147 Spring 26
+    Homework #1, problem 2
+
+    Testbench for the 16-bit CLA.
+*/
 module cla_16b_bench;
    reg [16:0] A;
    reg [16:0] B;

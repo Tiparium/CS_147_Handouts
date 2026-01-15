@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 1
+    CS 147 Spring 26
+    Homework #1, problem 1
 
-    4-1 mux template
+    1-bit 4:1 multiplexer built from 2:1 muxes.
 */
 module mux4_1(out, inA, inB, inC, inD, s);
     output       out;

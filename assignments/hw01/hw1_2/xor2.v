@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 2
+    CS 147 Spring 26
+    Homework #1, problem 2
 
-    2 input XOR
+    2-input XOR gate.
 */
 module xor2 (out,in1,in2);
     output out;

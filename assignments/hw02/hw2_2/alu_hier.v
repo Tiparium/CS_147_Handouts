@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #2, Problem 2
+    CS 147 Spring 26
+    Homework #2, problem 2
 
-    A wrapper for a multi-bit ALU module combined with clkrst.
+    Wrapper around the ALU for testing.
 */
 module alu_hier(InA, InB, Cin, Oper, invA, invB, sign, Out, Zero, Ofl);
 

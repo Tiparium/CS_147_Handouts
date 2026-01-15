@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 1
+    CS 147 Spring 26
+    Homework #1, problem 1
 
-    a 4-bit (quad) 4-1 Mux template
+    4-bit 4:1 multiplexer.
 */
 module mux4_1_4b(out, inA, inB, inC, inD, s);
 

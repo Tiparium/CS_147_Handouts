@@ -1,13 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #2, Problem 2
+    CS 147 Spring 26
+    Homework #2, problem 2
 
-    A multi-bit ALU module (defaults to 16-bit). It is designed to choose
-    the correct operation to perform on 2 multi-bit numbers from rotate
-    left, shift left, shift right arithmetic, shift right logical, add,
-    or, xor, & and.  Upon doing this, it should output the multi-bit result
-    of the operation, as well as drive the output signals Zero and Overflow
-    (OFL).
+    Multi-bit ALU implementation.
 */
 module alu (InA, InB, Cin, Oper, invA, invB, sign, Out, Zero, Ofl);
 

@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 1
+    CS 147 Spring 26
+    Homework #1, problem 1
 
-    2-1 mux template
+    1-bit 2:1 multiplexer.
 */
 module mux2_1(out, inA, inB, s);
     output  out;

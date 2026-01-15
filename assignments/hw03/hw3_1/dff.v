@@ -1,11 +1,8 @@
 /*
-   CS/ECE 552, Spring '22
-   homework #3, Problem #1
-  
-   This module creates a 1-bit D-flipflop (DFF).
+    CS 147 Spring 26
+    Homework #3, problem 1
 
-   YOU SHALL NOT EDIT THIS FILE. ANY CHANGES TO THIS FILE WILL
-   RESULT IN ZERO FOR THIS PROBLEM.
+    1-bit D flip-flop.
 */
 module dff (
             // Output

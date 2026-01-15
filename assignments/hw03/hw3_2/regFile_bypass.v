@@ -1,9 +1,8 @@
 /*
-   CS/ECE 552, Spring '22
-   Homework #3, Problem #2
-  
-   This module creates a wrapper around the 8x16b register file, to do
-   do the bypassing logic for RF bypassing.
+    CS 147 Spring 26
+    Homework #3, problem 2
+
+    Bypass wrapper around the register file.
 */
 module regFile_bypass (
                        // Outputs

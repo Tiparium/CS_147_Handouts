@@ -1,12 +1,9 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #2, Problem 1
-    
-    A barrel shifter module.  It is designed to shift a number via rotate
-    left, shift left, shift right arithmetic, or shift right logical based
-    on the 'Oper' value that is passed in.  It uses these
-    shifts to shift the value any number of bits.
- */
+    CS 147 Spring 26
+    Homework #2, problem 1
+
+    Barrel shifter implementation.
+*/
 module shifter (In, ShAmt, Oper, Out);
 
     // declare constant for size of inputs, outputs, and # bits to shift
