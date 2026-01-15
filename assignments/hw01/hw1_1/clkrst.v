@@ -2,7 +2,7 @@
 /* $LastChangedDate: 2009-03-04 23:09:45 -0600 (Wed, 04 Mar 2009) $ */
 /* $Rev: 45 $ */
 // clock and reset generator
-// CS/ECE 552
+// CS 147
 // Andy Phelps (TA)
 // 3/22/06
 
