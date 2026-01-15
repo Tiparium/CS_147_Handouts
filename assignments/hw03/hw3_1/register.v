@@ -1,8 +1,8 @@
 /*
-   CS 147, Spring 26
-   Homework #3, Problem #1
+    CS 147 Spring 26
+    Homework #3, problem 1
 
-   Parameterized N-bit register built from 1-bit DFFs.
+    Parameterized N-bit register built from DFFs.
 */
 // Shared via symlink between assignments/hw03/hw3_1/register.v and assignments/hw03/hw3_2/register.v.
 // WARNING: This file can be edited from either path, but DO NOT move or duplicate this file.

@@ -1,12 +1,9 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #2, Problem 1
-    
-    Testbench for the barrel shifter.  It is not exhaustive.  Rather,
-    it uses random values for In, ShAmt, and Oper across a large timespan
-    to test as many cases as possible and compare it with the golden
-    output (Expected).
- */
+    CS 147 Spring 26
+    Homework #2, problem 1
+
+    Testbench for the shifter wrapper.
+*/
 module shifter_hier_bench;
 
     // declare constant for size of inputs, outputs (N) and # bits to shift (C)

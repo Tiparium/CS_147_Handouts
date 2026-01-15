@@ -1,3 +1,9 @@
+/*
+    CS 147 Spring 26
+    Homework #1, problem 1
+
+    Testbench for the 4-bit 4:1 multiplexer.
+*/
 module mux4_1_4b_bench;
     // No inputs and outputs : testbenchs just a wrapper.
 

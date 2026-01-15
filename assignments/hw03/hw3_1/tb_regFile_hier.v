@@ -1,8 +1,8 @@
 /*
-   CS/ECE 552, Spring '22
-   Homework #3, Problem #1
-  
-   Random testbench for the 8x16b register file.
+    CS 147 Spring 26
+    Homework #3, problem 1
+
+    Testbench.
 */
 module tb_regFile_hier(/*AUTOARG*/);
     /*AUTOWIRE*/

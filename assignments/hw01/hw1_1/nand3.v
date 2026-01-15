@@ -1,8 +1,8 @@
 /*
-    CS/ECE 552 Spring '22
-    Homework #1, Problem 1
+    CS 147 Spring 26
+    Homework #1, problem 1
 
-    3 input NAND
+    3-input NAND gate.
 */
 module nand3 (out,in1,in2,in3);
     output out;

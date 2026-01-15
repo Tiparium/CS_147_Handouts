@@ -1,4 +1,9 @@
+/*
+    CS 147 Spring 26
+    Homework #2, problem 2
 
+    Clock and reset generator.
+*/
 // Clock period is 100 time units, and reset length
 // to 201 time units (two rising edges of clock).
 

@@ -1,3 +1,9 @@
+/*
+    CS 147 Spring 26
+    Homework #2, problem 2
+
+    Testbench for the ALU wrapper.
+*/
 module alu_hier_bench;
 
     // declare constant for size of inputs, outputs (N) and # bits to shift (C)

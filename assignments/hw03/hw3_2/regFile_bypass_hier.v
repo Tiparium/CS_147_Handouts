@@ -1,12 +1,9 @@
 /*
- CS/ECE 552, Spring '22
- Homework #3, Problem #2
- 
- Wrapper module around 8x16b register file with bypassing.
+    CS 147 Spring 26
+    Homework #3, problem 2
 
- YOU SHALL NOT EDIT THIS FILE. ANY CHANGES TO THIS FILE WILL
- RESULT IN ZERO FOR THIS PROBLEM.
- */
+    Wrapper around the bypass register file for testing.
+*/
 module regFile_bypass_hier (
                             // Outputs
                             read1Data, read2Data, 
