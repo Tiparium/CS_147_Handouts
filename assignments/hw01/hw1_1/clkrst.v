@@ -1,10 +1,3 @@
-/* $Author: karu $ */
-/* $LastChangedDate: 2009-03-04 23:09:45 -0600 (Wed, 04 Mar 2009) $ */
-/* $Rev: 45 $ */
-// clock and reset generator
-// CS 147
-// Andy Phelps (TA)
-// 3/22/06
 
 // Clock period is 100 time units, and reset length
 // to 201 time units (two rising edges of clock).
