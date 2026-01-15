@@ -55,8 +55,10 @@ for subdir in "${subdirs[@]}"; do
   fi
 
   cd "$subdir"
-  bench_files=(*_bench.v)
-  if [ "${bench_files[0]}" = "*_bench.v" ]; then
+  shopt -s nullglob
+  bench_files=(*_bench.v tb_*.v)
+  shopt -u nullglob
+  if [ "${#bench_files[@]}" -eq 0 ]; then
     echo "[FAIL] $(basename "$subdir"): no testbench found."
     overall_status=1
     continue
