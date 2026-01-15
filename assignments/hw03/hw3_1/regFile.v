@@ -1,5 +1,5 @@
 /*
-   CS/ECE 552, Spring '22
+   CS 147, Spring 26
    Homework #3, Problem #1
   
    This module creates a 16-bit register.  It has 1 write port, 2 read
@@ -7,6 +7,8 @@
    input.  All register state changes occur on the rising edge of the
    clock. 
 */
+// Shared via symlink between assignments/hw03/hw3_1/regFile.v and assignments/hw03/hw3_2/regFile.v.
+// WARNING: This file can be edited from either path, but DO NOT move or duplicate this file.
 module regFile (
                 // Outputs
                 read1Data, read2Data, err,

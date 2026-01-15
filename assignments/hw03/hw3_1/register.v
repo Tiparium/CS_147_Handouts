@@ -4,6 +4,8 @@
 
    Parameterized N-bit register built from 1-bit DFFs.
 */
+// Shared via symlink between assignments/hw03/hw3_1/register.v and assignments/hw03/hw3_2/register.v.
+// WARNING: This file can be edited from either path, but DO NOT move or duplicate this file.
 module register (
                  // Outputs
                  q, err,
