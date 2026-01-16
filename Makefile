@@ -55,6 +55,11 @@ clean_docker:
 	echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
 	  case $$ans in y|Y) \
+	    running_ids=$$(docker ps -q --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+	    if [ -n "$$running_ids" ]; then \
+	      echo "Stopping running containers using these images..."; \
+	      docker stop $$running_ids >/dev/null; \
+	    fi; \
 	    for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
 	      if docker image inspect "$$img" >/dev/null 2>&1; then \
 	        docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
@@ -158,7 +163,12 @@ clean:
 		      target_ids=$$(docker images --format '{{.Repository}} {{.ID}}' | awk -v t="$(DOCKER_IMAGE_NAME)" -v a="$(AUTOGRADER_IMAGE_NAME)" '$$1==t || $$1==a {print $$2}'); \
 		      echo -n "Clean Docker images ($(DOCKER_IMAGE_NAME), $(AUTOGRADER_IMAGE_NAME))? [y/N] " ; read ans ; \
 		      case $$ans in \
-		        y|Y) for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
+		        y|Y) running_ids=$$(docker ps -q --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+		              if [ -n "$$running_ids" ]; then \
+		                echo "Stopping running containers using these images..."; \
+		                docker stop $$running_ids >/dev/null; \
+		              fi; \
+		              for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
 			          if docker image inspect "$$img" >/dev/null 2>&1; then \
 			            docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
 			          else \
