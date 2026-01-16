@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 ASSIGNMENT_NAME := testing
 CUSTOM_SUBMIT := 1
 include ../assignment-common.mk
@@ -19,7 +20,8 @@ submit:
 	rm -f "$$submission_zip"; \
 	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
 	tmpdir=$$(mktemp -d); \
-	. "$$SPINNER_SH"; \
+	SPINNER_SH_PATH="$(SPINNER_SH)"; \
+	. "$$SPINNER_SH_PATH"; \
 	section() { \
 	  name="$$1"; status_var="$$2"; shift 2; \
 	  eval "$$status_var=pass"; \
