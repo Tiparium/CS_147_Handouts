@@ -66,6 +66,12 @@ clean_docker:
 	    if [ -n "$$dangling_from_targets" ]; then \
 	      echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
 	    fi; \
+	    dang=$$(docker images --filter dangling=true -q); \
+	    if [ -n "$$dang" ]; then \
+	      echo -n "Remove remaining dangling <none> images? [y/N] " ; \
+	      read ansd ; \
+	      case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
+	    fi; \
 	    echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
 	    read ans2 ; \
 	    case $$ans2 in \
@@ -162,6 +168,12 @@ clean:
 			        dangling_from_targets=$$(docker images --format '{{.ID}} {{.Repository}} {{.Tag}}' | awk -v ids="$$target_ids" 'BEGIN{n=split(ids,a,/[^0-9a-f]+/); for(i=1;i<=n;i++) if(a[i]!="") s[a[i]]=1} $$2=="<none>" && s[$$1]{print $$1}'); \
 			        if [ -n "$$dangling_from_targets" ]; then \
 			          echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
+			        fi; \
+			        dang=$$(docker images --filter dangling=true -q); \
+			        if [ -n "$$dang" ]; then \
+			          echo -n "Remove remaining dangling <none> images? [y/N] " ; \
+			          read ansd ; \
+			          case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
 			        fi; \
 			        echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; read ans2 ; \
 			        case $$ans2 in \
