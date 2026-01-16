@@ -9,6 +9,9 @@ set -euo pipefail
 IMAGE_TAG="${IMAGE_TAG:-gradescope/autograder-base}"
 RESULTS_DIR="${RESULTS_DIR:-local_results}"
 SUBMISSIONS_ROOT="${SUBMISSIONS_ROOT:-test_submissions}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPINNER_SH="$SCRIPT_DIR/../../../scripts/spinner.sh"
+source "$SPINNER_SH"
 cleanup_dir=""
 progress_pid=""
 VERBOSE="${VERBOSE:-${AG_VERBOSE:-0}}"
@@ -84,20 +87,7 @@ cleanup() {
 progress() {
   local pid="$1"
   local start_ts="$2"
-  local chars='|/-\\'
-  local i=0
-  while kill -0 "$pid" 2>/dev/null; do
-    local elapsed=$(( $(date +%s) - start_ts ))
-    local mins=$(( elapsed / 60 ))
-    local secs=$(( elapsed % 60 ))
-    printf "\r[progress] %02d:%02d %s" "$mins" "$secs" "${chars:i:1}" >&2
-    i=$(( (i + 1) % ${#chars} ))
-    sleep 0.25
-  done
-  local elapsed=$(( $(date +%s) - start_ts ))
-  local mins=$(( elapsed / 60 ))
-  local secs=$(( elapsed % 60 ))
-  printf "\r[progress] done in %02d:%02d   \r" "$mins" "$secs" >&2
+  spinner_wait "$pid" "Autograder" "$start_ts"
 }
 
 cmd="${1:-}"
