@@ -1,5 +1,11 @@
-module not1 (in1,out);
-input in1;
-output out;
-assign out = ~in1;
+/*
+    CS 147 Spring 26
+    Homework #1, problem 1
+
+    1-input NOT gate.
+*/
+module not1 (out, in1);
+    output out;
+    input in1;
+    assign out = ~in1;
 endmodule

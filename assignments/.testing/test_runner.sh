@@ -55,8 +55,10 @@ for subdir in "${subdirs[@]}"; do
   fi
 
   cd "$subdir"
-  bench_files=(*_bench.v)
-  if [ "${bench_files[0]}" = "*_bench.v" ]; then
+  shopt -s nullglob
+  bench_files=(*_bench.v tb_*.v)
+  shopt -u nullglob
+  if [ "${#bench_files[@]}" -eq 0 ]; then
     echo "[FAIL] $(basename "$subdir"): no testbench found."
     overall_status=1
     continue
@@ -97,11 +99,13 @@ for subdir in "${subdirs[@]}"; do
 
     [ "$VERBOSE" -eq 1 ] && echo "[CMD] vvp $out"
     if [ "$VERBOSE" -eq 1 ]; then
-      vvp "$out" 2>&1 | tee -a "$log"
+      vvp "$out" <<<"finish" 2>&1 | tee -a "$log"
+      vvp_status="${PIPESTATUS[0]}"
     else
-      vvp "$out" >>"$log" 2>&1
+      vvp "$out" <<<"finish" >>"$log" 2>&1
+      vvp_status=$?
     fi
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+    if [ "$vvp_status" -ne 0 ]; then
       sub_errors=$((sub_errors + 1))
       [ "$VERBOSE" -eq 1 ] && cat "$log"
       continue

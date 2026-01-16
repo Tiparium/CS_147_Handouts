@@ -1,9 +1,15 @@
-/* $Author: karu $ */
-/* $LastChangedDate: 2009-03-04 23:09:45 -0600 (Wed, 04 Mar 2009) $ */
-/* $Rev: 45 $ */
-// D-flipflop
+/*
+    CS 147 Spring 26
+    Homework #3, problem 2
 
-module dff (q, d, clk, rst);
+    1-bit D flip-flop.
+*/
+module dff (
+            // Output
+            q,
+            // Inputs
+            d, clk, rst
+            );
 
     output         q;
     input          d;
@@ -19,4 +25,3 @@ module dff (q, d, clk, rst);
     end
 
 endmodule
-// DUMMY LINE FOR REV CONTROL :0:

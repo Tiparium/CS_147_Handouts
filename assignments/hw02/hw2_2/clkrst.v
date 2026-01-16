@@ -1,11 +1,9 @@
-/* $Author: karu $ */
-/* $LastChangedDate: 2009-03-04 23:09:45 -0600 (Wed, 04 Mar 2009) $ */
-/* $Rev: 45 $ */
-// clock and reset generator
-// CS 147
-// Andy Phelps (TA)
-// 3/22/06
+/*
+    CS 147 Spring 26
+    Homework #2, problem 2
 
+    Clock and reset generator.
+*/
 // Clock period is 100 time units, and reset length
 // to 201 time units (two rising edges of clock).
 
@@ -34,13 +32,18 @@ module clkrst (clk, rst, err);
         $stop;
       end
     end
-
     always @(posedge clk) begin
-    	cycle_count = cycle_count + 1;
-	if (cycle_count > 100000) begin
-		$display("hmm....more than 100000 cycles of simulation...error?\n");
-		$finish;
-	end
+       cycle_count = cycle_count + 1;
+       /*
+         MDS (3/25/19): change from 100000 cycles to 100004 cycles to
+         allow tests that intentionally loop infinitely to pass in wiscalculator;
+         without this change, such benchmarks will erroneously fail due to
+         reset cycles at the beginning.
+        */
+        if (cycle_count > 100004) begin
+          $display("hmm....more than 100004 cycles of simulation...error?\n");
+          $finish;
+        end
     end
 
 

@@ -1,85 +1,131 @@
+/*
+    CS 147 Spring 26
+    Homework #2, problem 1
+
+    Testbench for the shifter wrapper.
+*/
 module shifter_hier_bench;
-   
-   reg [15:0] In;
-   reg [3:0]  Cnt;
-   reg [1:0]  Op;
-   wire [15:0] Out;
 
-   reg         fail;
+    // declare constant for size of inputs, outputs (N) and # bits to shift (C)
+    parameter OP_WIDTH    = 16;
+    parameter SHAMT_WIDTH =  4;
+    parameter NUM_OPS     =  2;   
 
-   reg [31:0]  Expected;
-   integer     idx;
-   
-   shifter_hier DUT (.In(In), .Cnt(Cnt), .Op(Op), .Out(Out));
+    // Signals for barrel shifter 
+    reg [OP_WIDTH   -1:0] In;
+    reg [SHAMT_WIDTH-1:0] ShAmt;
+    reg [NUM_OPS    -1:0] Oper;
+    wire [OP_WIDTH  -1:0] Out;
 
-   initial
-     begin
-	In = 16'h0000;
-	Cnt = 4'b0000;
-	Op = 2'b00;
+    reg                   fail;
+
+    reg [31:0]            Expected;
+    integer               idx;
+
+    shifter_hier #(.OPERAND_WIDTH(OP_WIDTH),
+                   .SHAMT_WIDTH(SHAMT_WIDTH),
+                   .NUM_OPERATIONS(NUM_OPS)) 
+                 DUT (.In(In), .ShAmt(ShAmt), .Oper(Oper), .Out(Out));
+
+    initial begin
+        In = 16'h0000;
+        ShAmt = 4'b0000;
+        Oper = 2'b00;
         fail = 0;
-	
-	#5000;
+        
+        #10000;
         if (fail)
-          $display("TEST FAILED");
+            $display("TEST FAILED");
         else
-          $display("TEST PASSED");
+            $display("TEST PASSED");
         $finish;
-     end
+    end
 
-   always@(posedge DUT.clk)
-     begin
-	In[15:0] = $random;
-        //	In[15:0] = 16'hA0A0;
-	Cnt[3:0] = $random;
-	Op[1:0] = $random;
-     end
+    always @(posedge DUT.clk) begin
+        In[15:0] = $random;
+        ShAmt[3:0] = $random;
+        Oper[1:0] = $random;
+    end
 
    
-   always@(negedge DUT.clk)
-     begin
-	case (Op)
-	  2'b00 :
-	    // Rotate Left
-	    begin
-	       Expected = In << Cnt | In >> 16-Cnt;
-	       if (Expected[15:0] !== Out) begin
-		  $display("ERRORCHECK :: Shifter :: Rotate Left       : Count : %d, In = %x ; Expected : %x, Got %x", Cnt, In, Expected[15:0], Out);
-                  fail = 1;
-               end
-	    end
-	  2'b01 :
-	    // Shift Left
-	    begin
-	       Expected = In << Cnt;
-	       if (Expected[15:0] !== Out) begin
-		  $display("ERRORCHECK :: Shifter :: Shift Left        : Count : %d, In = %x ; Expected : %x, Got %x", Cnt, In, Expected[15:0], Out);
-                  fail = 1;
-               end
-	    end
-	  2'b10 :
-	    // Shift Right Arithmetic
-	    begin
-	       for(idx = 31; idx > 15 ; idx = idx - 1)
-		 Expected[idx] = In[15];
-	       Expected[15:0] = In[15:0];
-	       Expected[15:0] = Expected >> Cnt;
-	       if (Expected[15:0] !== Out) begin
-		  $display("ERRORCHECK :: Shifter :: Shift Right Arith : Count : %d, In = %x ; Expected : %x, Got %x", Cnt, In, Expected[15:0], Out);
-                  fail = 1;
-               end
-	    end
-	  2'b11 :
-            // Shift Right Logical
-	    begin
-	       Expected = In >> Cnt;
-	       if (Expected[15:0] !== Out) begin
-		  $display("ERRORCHECK :: Shifter :: Shift Right Logic : Count : %d, In = %x ; Expected : %x, Got %x", Cnt, In, Expected[15:0], Out);
-                  fail = 1;
-               end
-	    end
-	  //
-   	endcase
-     end
+    always @(negedge DUT.clk) begin
+        case (Oper)
+            2'b00 : begin // Rotate Left
+                Expected = (In << ShAmt) | (In >> (16-ShAmt));
+
+                if (Expected[15:0] !== Out) begin
+                    $display("ERRORCHECK :: BarrelShifter :: Rotate Left       : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                    fail = 1;
+                end else begin
+                    $display("LOG :: BarrelShifter :: Rotate Left       : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                end
+            end
+            2'b01 : begin // Shift Left
+                Expected = In << ShAmt;
+
+                if (Expected[15:0] !== Out) begin
+                    $display("ERRORCHECK :: BarrelShifter :: Shift Left        : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                    fail = 1;
+                end else begin
+                    $display("LOG :: BarrelShifter :: Shift Left        : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                end
+            end
+            2'b10 : begin // Shift Right Arithmetic
+                for(idx = 31; idx > 15 ; idx = idx - 1)
+                    Expected[idx] = In[15];
+
+                Expected[15:0] = In[15:0];
+                Expected[15:0] = Expected >> ShAmt;
+                if (Expected[15:0] !== Out) begin
+                    $display("ERRORCHECK :: BarrelShifter :: Shift Right Arith : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                    fail = 1;
+                end else begin
+                    $display("LOG :: BarrelShifter :: Shift Right Arith : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                end
+            end
+            2'b11 : begin // Shift Right Logical
+                Expected = In >> ShAmt;
+
+                if (Expected[15:0] !== Out) begin
+                    $display("ERRORCHECK :: BarrelShifter :: Shift Right Logic : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                    fail = 1;
+                end else begin
+                    $display("LOG :: BarrelShifter :: Shift Right Logic : ShAmt : %d, In = 0x%x ; Expected : 0x%x, Got 0x%x", 
+                            ShAmt, 
+                            In, 
+                            Expected[15:0], 
+                            Out);
+                end
+            end
+        endcase
+    end
    
-endmodule // tb_shifter
+endmodule // shifter_hier_bench

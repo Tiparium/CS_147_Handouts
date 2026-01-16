@@ -25,12 +25,23 @@ target="$1"
 run_file() {
   local f="$1"
   local base
+  local tmp
+  local status=0
   base="$(basename "$f")"
-  if [[ "$base" == tb_* ]] || [[ "$base" == *_tb.v ]] || [[ "$base" == *tb.v ]]; then
+  if [[ "$base" == tb_* ]] || [[ "$base" == *_tb.v ]] || [[ "$base" == *tb.v ]] || [[ "$base" == *_bench.v ]] || [[ "$base" == clkrst.v ]] || [[ "$base" == dff.v ]]; then
     return 0
   fi
   echo "  [CHECK] $f"
-  java -cp "$CHECKER_DIR" Vcheck "$f"
+  tmp="$(mktemp)"
+  if ! java -cp "$CHECKER_DIR" Vcheck "$f" >"$tmp" 2>&1; then
+    status=1
+  fi
+  cat "$tmp"
+  if grep -Eq '^Line [0-9]+' "$tmp"; then
+    status=1
+  fi
+  rm -f "$tmp"
+  return "$status"
 }
 
 run_dir_recursive() {
