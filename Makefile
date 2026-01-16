@@ -51,7 +51,8 @@ clean_docker:
 		echo "Error: docker not found. Run this on the host (not inside ./run)."; \
 		exit 1; \
 	fi
-	@echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
+	@target_ids=$$(docker images --format '{{.Repository}} {{.ID}}' | awk -v t="$(DOCKER_IMAGE_NAME)" -v a="$(AUTOGRADER_IMAGE_NAME)" '$$1==t || $$1==a {print $$2}'); \
+	echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
 	  case $$ans in y|Y) \
 	    for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
@@ -61,6 +62,10 @@ clean_docker:
 	        echo "Image $$img not found."; \
 	      fi; \
 	    done; \
+	    dangling_from_targets=$$(docker images --format '{{.ID}} {{.Repository}} {{.Tag}}' | awk -v ids="$$target_ids" 'BEGIN{n=split(ids,a,/[^0-9a-f]+/); for(i=1;i<=n;i++) if(a[i]!="") s[a[i]]=1} $$2=="<none>" && s[$$1]{print $$1}'); \
+	    if [ -n "$$dangling_from_targets" ]; then \
+	      echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
+	    fi; \
 	    echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
 	    read ans2 ; \
 	    case $$ans2 in \
@@ -144,6 +149,7 @@ clean:
 		    if ! command -v docker >/dev/null 2>&1; then \
 		      echo "Docker not found; skipping Docker clean."; skipped="$$skipped $$tgt" ; \
 		    else \
+		      target_ids=$$(docker images --format '{{.Repository}} {{.ID}}' | awk -v t="$(DOCKER_IMAGE_NAME)" -v a="$(AUTOGRADER_IMAGE_NAME)" '$$1==t || $$1==a {print $$2}'); \
 		      echo -n "Clean Docker images ($(DOCKER_IMAGE_NAME), $(AUTOGRADER_IMAGE_NAME))? [y/N] " ; read ans ; \
 		      case $$ans in \
 		        y|Y) for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
@@ -153,6 +159,10 @@ clean:
 			            echo "Image $$img not found."; \
 			          fi; \
 			        done; \
+			        dangling_from_targets=$$(docker images --format '{{.ID}} {{.Repository}} {{.Tag}}' | awk -v ids="$$target_ids" 'BEGIN{n=split(ids,a,/[^0-9a-f]+/); for(i=1;i<=n;i++) if(a[i]!="") s[a[i]]=1} $$2=="<none>" && s[$$1]{print $$1}'); \
+			        if [ -n "$$dangling_from_targets" ]; then \
+			          echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
+			        fi; \
 			        echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; read ans2 ; \
 			        case $$ans2 in \
 			          y|Y) if command -v python3 >/dev/null 2>&1; then \
