@@ -124,7 +124,8 @@ nuke_docker:
 clean_logs:
 	@rm -f .testing_selftest_attempt*.log
 	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
-	@echo "Removed local self-test logs."
+	@find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete
+	@echo "Removed logs, VCDs, and bench outputs under assignments/."
 
 CLEAN_STEPS := clean_turnins clean_docker clean_logs
 
@@ -169,6 +170,7 @@ clean:
 		    echo -n "Clean log files? [y/N] " ; read ans ; \
 		    case $$ans in \
 		      y|Y) rm -f .testing_selftest_attempt*.log assignments/.testing/selftest_logs/.testing_selftest_attempt*.log; \
+		           find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete; \
 		           echo "Logs cleaned."; cleaned="$$cleaned $$tgt" ;; \
 		      *) echo "Logs skipped."; skipped="$$skipped $$tgt" ;; \
 		    esac ;; \
