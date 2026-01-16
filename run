@@ -57,40 +57,7 @@ if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
   SOCK_OPTS=("${DOCKER_SOCK_VOLUME[@]}")
 fi
 SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
-
-run_with_spinner() {
-  label="$1"; shift
-  start_ts=$(date +%s)
-  "$@" &
-  cmd_pid=$!
-  if [ -t 1 ]; then
-    i=0
-    while kill -0 "$cmd_pid" 2>/dev/null; do
-      elapsed=$(( $(date +%s) - start_ts ))
-      mins=$((elapsed / 60)); secs=$((elapsed % 60))
-      case $i in
-        0) spin_char='|' ;;
-        1) spin_char='/' ;;
-        2) spin_char='-' ;;
-        3) spin_char='\\' ;;
-      esac
-      printf "\r  [INFO] %s: %s %02d:%02d" "$label" "$spin_char" "$mins" "$secs"
-      i=$(( (i + 1) % 4 ))
-      sleep 0.2
-    done
-    wait "$cmd_pid"; rc=$?
-    elapsed=$(( $(date +%s) - start_ts ))
-    mins=$((elapsed / 60)); secs=$((elapsed % 60))
-    printf "\r  [INFO] %s completed in %02d:%02d\n" "$label" "$mins" "$secs"
-    return $rc
-  else
-    wait "$cmd_pid"; rc=$?
-    elapsed=$(( $(date +%s) - start_ts ))
-    mins=$((elapsed / 60)); secs=$((elapsed % 60))
-    printf "  [INFO] %s completed in %02d:%02d\n" "$label" "$mins" "$secs"
-    return $rc
-  fi
-}
+source "$REPO_ROOT/scripts/spinner.sh"
 
 print_help() {
   cat <<'EOF'

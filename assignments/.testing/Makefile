@@ -7,6 +7,7 @@ SUBMISSION_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissi
 ERRORS_DIR := $(ASSIGNMENT_DIR)/errors
 AUTOGRADER_DIR := $(ASSIGNMENT_DIR)/Gradescope_Autograder_Template
 WAVES_DIR := $(ASSIGNMENT_DIR)/waves
+SPINNER_SH := $(abspath $(ASSIGNMENTS_ROOT)/../scripts/spinner.sh)
 
 .PHONY: submit
 submit:
@@ -18,35 +19,7 @@ submit:
 	rm -f "$$submission_zip"; \
 	(cd "$(ASSIGNMENT_DIR)" && zip -rq "$$submission_zip" . -x "errors" "errors/*" "Gradescope_Autograder_Template/failed tests" "Gradescope_Autograder_Template/failed tests/*"); \
 	tmpdir=$$(mktemp -d); \
-	run_with_spinner() { \
-	  label="$$1"; shift; \
-	  start_ts=$$(date +%s); \
-	  if [ -t 1 ]; then \
-	    i=0; \
-	    "$$@" & \
-	    cmd_pid=$$!; \
-	    while kill -0 "$$cmd_pid" 2>/dev/null; do \
-	      elapsed=$$(( $$(date +%s) - start_ts )); \
-	      mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
-	      case $$i in \
-	        0) spin_char='|' ;; \
-	        1) spin_char='/' ;; \
-	        2) spin_char='-' ;; \
-	        3) spin_char='\\' ;; \
-	      esac; \
-	      printf "\r  [INFO] %s: %s %02d:%02d" "$$label" "$$spin_char" "$$mins" "$$secs"; \
-	      i=$$(( (i + 1) % 4 )); \
-	      sleep 0.2; \
-	    done; \
-	    wait "$$cmd_pid"; rc=$$?; \
-	  else \
-	    "$$@"; rc=$$?; \
-	  fi; \
-	  elapsed=$$(( $$(date +%s) - start_ts )); \
-	  mins=$$((elapsed / 60)); secs=$$((elapsed % 60)); \
-	  printf "%02d:%02d\n" "$$mins" "$$secs"; \
-	  return $$rc; \
-	}; \
+	. "$$SPINNER_SH"; \
 	section() { \
 	  name="$$1"; status_var="$$2"; shift 2; \
 	  eval "$$status_var=pass"; \
@@ -84,7 +57,8 @@ submit:
 	    primary_status="fail"; \
 	  else \
 	    autolog=$$(mktemp); \
-	    elapsed_setup=$$(run_with_spinner "Autograder setup" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run setup >\"$$autolog\" 2>&1"); \
+	    run_with_spinner "Autograder setup" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run setup >\"$$autolog\" 2>&1"; \
+	    elapsed_setup=$$SPINNER_ELAPSED; \
 	    rc_setup=$$?; \
 	    if [ $$rc_setup -eq 0 ]; then \
 	      reuse_note=""; \
@@ -98,7 +72,8 @@ submit:
 	      primary_status="fail"; \
 	    fi; \
 	    if [ "$$primary_status" = "pass" ]; then \
-	      elapsed_grade=$$(run_with_spinner "Autograder grade" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run grade \"./test_submissions/submission_test.zip\" >>\"$$autolog\" 2>&1"); \
+	      run_with_spinner "Autograder grade" sh -c "cd \"$(AUTOGRADER_DIR)\" && ./run grade \"./test_submissions/submission_test.zip\" >>\"$$autolog\" 2>&1"; \
+	      elapsed_grade=$$SPINNER_ELAPSED; \
 	      rc_grade=$$?; \
 	      if [ $$rc_grade -eq 0 ]; then \
 	        echo "  [OK] Autograder grade (elapsed $$elapsed_grade)"; \
