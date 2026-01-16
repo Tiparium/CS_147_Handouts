@@ -51,9 +51,15 @@ clean_docker:
 		echo "Error: docker not found. Run this on the host (not inside ./run)."; \
 		exit 1; \
 	fi
-	@echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
+	@target_ids=$$(docker images --format '{{.Repository}} {{.ID}}' | awk -v t="$(DOCKER_IMAGE_NAME)" -v a="$(AUTOGRADER_IMAGE_NAME)" '$$1==t || $$1==a {print $$2}'); \
+	echo -n "This will remove Docker images '$(DOCKER_IMAGE_NAME)' and '$(AUTOGRADER_IMAGE_NAME)'. Are you sure you want to continue? [y/N] " ; \
 	  read ans ; \
 	  case $$ans in y|Y) \
+	    running_ids=$$(docker ps -q --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+	    if [ -n "$$running_ids" ]; then \
+	      echo "Stopping running containers using these images..."; \
+	      docker stop $$running_ids >/dev/null; \
+	    fi; \
 	    for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
 	      if docker image inspect "$$img" >/dev/null 2>&1; then \
 	        docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
@@ -61,6 +67,16 @@ clean_docker:
 	        echo "Image $$img not found."; \
 	      fi; \
 	    done; \
+	    dangling_from_targets=$$(docker images --format '{{.ID}} {{.Repository}} {{.Tag}}' | awk -v ids="$$target_ids" 'BEGIN{n=split(ids,a,/[^0-9a-f]+/); for(i=1;i<=n;i++) if(a[i]!="") s[a[i]]=1} $$2=="<none>" && s[$$1]{print $$1}'); \
+	    if [ -n "$$dangling_from_targets" ]; then \
+	      echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
+	    fi; \
+	    dang=$$(docker images --filter dangling=true -q); \
+	    if [ -n "$$dang" ]; then \
+	      echo -n "Remove remaining dangling <none> images? [y/N] " ; \
+	      read ansd ; \
+	      case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
+	    fi; \
 	    echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; \
 	    read ans2 ; \
 	    case $$ans2 in \
@@ -124,7 +140,8 @@ nuke_docker:
 clean_logs:
 	@rm -f .testing_selftest_attempt*.log
 	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
-	@echo "Removed local self-test logs."
+	@find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete
+	@echo "Removed logs, VCDs, and bench outputs under assignments/."
 
 CLEAN_STEPS := clean_turnins clean_docker clean_logs
 
@@ -143,15 +160,31 @@ clean:
 		    if ! command -v docker >/dev/null 2>&1; then \
 		      echo "Docker not found; skipping Docker clean."; skipped="$$skipped $$tgt" ; \
 		    else \
+		      target_ids=$$(docker images --format '{{.Repository}} {{.ID}}' | awk -v t="$(DOCKER_IMAGE_NAME)" -v a="$(AUTOGRADER_IMAGE_NAME)" '$$1==t || $$1==a {print $$2}'); \
 		      echo -n "Clean Docker images ($(DOCKER_IMAGE_NAME), $(AUTOGRADER_IMAGE_NAME))? [y/N] " ; read ans ; \
 		      case $$ans in \
-		        y|Y) for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
+		        y|Y) running_ids=$$(docker ps -q --filter "ancestor=$(DOCKER_IMAGE_NAME)" --filter "ancestor=$(AUTOGRADER_IMAGE_NAME)"); \
+		              if [ -n "$$running_ids" ]; then \
+		                echo "Stopping running containers using these images..."; \
+		                docker stop $$running_ids >/dev/null; \
+		              fi; \
+		              for img in "$(DOCKER_IMAGE_NAME)" "$(AUTOGRADER_IMAGE_NAME)"; do \
 			          if docker image inspect "$$img" >/dev/null 2>&1; then \
 			            docker rmi -f "$$img" >/dev/null && echo "Removed image $$img."; \
 			          else \
 			            echo "Image $$img not found."; \
 			          fi; \
 			        done; \
+			        dangling_from_targets=$$(docker images --format '{{.ID}} {{.Repository}} {{.Tag}}' | awk -v ids="$$target_ids" 'BEGIN{n=split(ids,a,/[^0-9a-f]+/); for(i=1;i<=n;i++) if(a[i]!="") s[a[i]]=1} $$2=="<none>" && s[$$1]{print $$1}'); \
+			        if [ -n "$$dangling_from_targets" ]; then \
+			          echo "$$dangling_from_targets" | xargs -r docker rmi -f >/dev/null && echo "Removed dangling images for $(DOCKER_IMAGE_NAME)/$(AUTOGRADER_IMAGE_NAME)."; \
+			        fi; \
+			        dang=$$(docker images --filter dangling=true -q); \
+			        if [ -n "$$dang" ]; then \
+			          echo -n "Remove remaining dangling <none> images? [y/N] " ; \
+			          read ansd ; \
+			          case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
+			        fi; \
 			        echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; read ans2 ; \
 			        case $$ans2 in \
 			          y|Y) if command -v python3 >/dev/null 2>&1; then \
@@ -169,6 +202,7 @@ clean:
 		    echo -n "Clean log files? [y/N] " ; read ans ; \
 		    case $$ans in \
 		      y|Y) rm -f .testing_selftest_attempt*.log assignments/.testing/selftest_logs/.testing_selftest_attempt*.log; \
+		           find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete; \
 		           echo "Logs cleaned."; cleaned="$$cleaned $$tgt" ;; \
 		      *) echo "Logs skipped."; skipped="$$skipped $$tgt" ;; \
 		    esac ;; \
