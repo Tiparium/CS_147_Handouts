@@ -181,7 +181,7 @@ case "${1:-}" in
       *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
     esac
     shift || true
-    exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$make_target" "$@"
+    exec make "$make_target" "$@"
     ;;
   student_name|wave_test)
     target="$1"; shift
