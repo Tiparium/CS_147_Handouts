@@ -261,20 +261,15 @@ if [ "${1:-}" = "setup" ]; then
   echo "[SELF-TEST] .testing"
   echo "============================================================"
   mkdir -p "$SELFTEST_LOG_DIR"
-  overall_start_ts=$(date +%s)
   attempt=1
   set +e  # allow retries even when commands fail inside the loop
   while [ $attempt -le 3 ]; do
     echo "---------------- attempt $attempt/3 ----------------"
     log_file="$SELFTEST_LOG_DIR/.testing_selftest_attempt${attempt}.log"
-    if run_with_spinner "Self-test attempt $attempt" docker run --rm -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w /repo "$IMAGE_NAME" bash -lc "set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\"$TEST_FORCE\"}" >"$log_file" 2>&1; then
-      echo "---------------- self-test report ----------------"
+    if run_with_spinner "Self-test attempt $attempt" bash -lc "docker run --rm -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
       cat "$log_file"
       echo "============================================================"
       echo "[SELF-TEST] PASS"
-      overall_elapsed=$(( $(date +%s) - overall_start_ts ))
-      overall_mins=$((overall_elapsed / 60)); overall_secs=$((overall_elapsed % 60))
-      echo "[SELF-TEST] Total time: ${overall_mins}m ${overall_secs}s"
       echo "------------------------------------------------------------"
       exit 0
     else
@@ -290,9 +285,6 @@ if [ "${1:-}" = "setup" ]; then
   set -e
   echo "============================================================"
   echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
-  overall_elapsed=$(( $(date +%s) - overall_start_ts ))
-  overall_mins=$((overall_elapsed / 60)); overall_secs=$((overall_elapsed % 60))
-  echo "[SELF-TEST] Total time: ${overall_mins}m ${overall_secs}s"
   if ls "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
     echo "Saved logs:"
     ls -1 "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log
