@@ -221,7 +221,6 @@ case "${1:-}" in
       fi
       rc=0
       for hw in "${assignments[@]}"; do
-        echo "[submit] running submit for $hw..."
         if [ ${#submit_flags[@]} -gt 0 ]; then
           "$REPO_ROOT/run" submit "${submit_flags[@]}" "$hw" || rc=$?
         else

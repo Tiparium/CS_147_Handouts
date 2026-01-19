@@ -73,7 +73,7 @@ def parse_hash_block(report_path: Path) -> Tuple[Dict[str, str], List[str]]:
 def _hash_report_body(report_path: Path) -> Optional[str]:
     if not report_path.exists():
         return None
-    data = report_path.read_bytes()
+    data = report_path.read_text(errors="ignore")
     lines = data.splitlines(keepends=True)
     body_lines = []
     in_hash = True
@@ -87,8 +87,8 @@ def _hash_report_body(report_path: Path) -> Optional[str]:
                 continue
             in_hash = False
         body_lines.append(line)
-    body = b"".join(body_lines)
-    return hashlib.sha256(body).hexdigest()
+    body = "".join(body_lines)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
 def recompute_hashes(submission_root: Path) -> Dict[str, str]:
