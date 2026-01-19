@@ -28,7 +28,6 @@ LAST_ZIP_MARKER := $(ASSIGNMENT_DIR)/.last_submit_zip
 ifndef CUSTOM_SUBMIT
 submit:
 	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
-	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
 	@set +e; test_rc=0; \
 	(cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh $(ASSIGNMENT_NAME) | tee "$(ASSIGNMENT_DIR)/submission_report.log"'); \
 	test_rc=$$?; set -e; \
@@ -38,7 +37,13 @@ submit:
 	@# Capture verbose test output separately for debugging (not shown to user)
 	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.log"'); set -e
 	@echo "[submit] computing hashes..."
-	@(cd "$(ASSIGNMENT_DIR)" && find . -type f \( -name '*.v' -o -name '*.sv' \) -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) >"$(ASSIGNMENT_DIR)/hashes.tmp"
+	@(cd "$(ASSIGNMENT_DIR)" && \
+	  files="$$(find . -type f \( -name '*.v' -o -name '*.sv' \) -print)"; \
+	  if [ -n "$$files" ]; then \
+	    printf "%s\n" "$$files" | LC_ALL=C sort | xargs sha256sum; \
+	  else \
+	    :; \
+	  fi) >"$(ASSIGNMENT_DIR)/hashes.tmp"
 	@if [ "${AG_HASH_VERBOSE}" = "1" ]; then \
 	  echo "================ HASH REPORT (pre-zip) ================"; \
 	  cat "$(ASSIGNMENT_DIR)/hashes.tmp"; \
