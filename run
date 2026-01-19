@@ -211,7 +211,10 @@ case "${1:-}" in
       if [ ${#extra_make_args[@]} -gt 0 ]; then
         submit_flags+=("${extra_make_args[@]}")
       fi
-      mapfile -t assignments < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+      assignments=()
+      while IFS= read -r hw; do
+        [ -n "$hw" ] && assignments+=("$hw")
+      done < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
       if [ ${#assignments[@]} -eq 0 ]; then
         echo "[submit] no assignments found under $REPO_ROOT/assignments" >&2
         exit 1
