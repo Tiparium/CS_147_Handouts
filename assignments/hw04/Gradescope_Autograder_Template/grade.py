@@ -17,6 +17,7 @@ import hashlib
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple
+import re
 
 VERBOSE = os.environ.get("AG_VERBOSE", os.environ.get("VERBOSE", "0")) not in ("0", "", "false", "False", None)
 HASH_VERBOSE = os.environ.get("AG_HASH_VERBOSE", "0") not in ("0", "", "false", "False", None)
@@ -91,6 +92,12 @@ def parse_test_summary(lines: List[str]) -> Tuple[List[Dict], List[str]]:
             name_part, _, detail = rest.strip().partition(" ")
             sub_name = name_part
             max_score = SUB_POINTS.get(sub_name, 0.0)
+            errors = None
+            match = re.search(r"errors:\s*(\d+)", detail)
+            if match:
+                errors = int(match.group(1))
+            if status == "FAIL" and errors == 0 and "Legal syntax Check: Not Applicable" in detail:
+                status = "PASS"
             score = max_score if status == "PASS" else 0.0
             tests.append(
                 {

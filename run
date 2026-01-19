@@ -58,7 +58,7 @@ if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
 fi
 SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
 source "$REPO_ROOT/scripts/spinner.sh"
-DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:-}"
+DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
 SIM_PLATFORM_FLAG="${SIM_PLATFORM_FLAG:---platform linux/amd64}"
 
 print_help() {
@@ -79,6 +79,9 @@ print_help() {
   [HW4 Tools]
     ./run assemble <in> <out>    Run the WISC assembler (writes <out>_*.img and <out>.lst).
     ./run simulate <img>         Run the WISC simulator on a loadfile image.
+
+  [Debug]
+    ./run generate <name>        Run debug generators (e.g., ./run generate tools).
 
   [Student Info]
     ./run student_name           View/update the recorded student name.
@@ -118,6 +121,27 @@ fi
 if [ "${1:-}" = "simulate" ]; then
   shift
   exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
+fi
+
+if [ "${1:-}" = "generate" ]; then
+  shift
+  subcmd="${1:-}"
+  if [ -z "$subcmd" ]; then
+    echo "Usage: ./run generate <name>" >&2
+    echo "Available: tools" >&2
+    exit 1
+  fi
+  shift || true
+  case "$subcmd" in
+    tools)
+      exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" /repo/assignments/tools/TA/assembler_simulator_testing/run_tests.sh "$@"
+      ;;
+    *)
+      echo "Unknown generate target: $subcmd" >&2
+      echo "Available: tools" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 if [ "${1:-}" = "makeexecutable" ]; then
@@ -342,7 +366,19 @@ if [ "${1:-}" = "setup" ]; then
     chmod +x "$REPO_ROOT/assignments/tools/simulator/wiscalculator"
   fi
   echo "Building Docker image '$IMAGE_NAME'..."
-  docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+  if [ -n "$DOCKER_PLATFORM_FLAG" ]; then
+    if docker buildx version >/dev/null 2>&1; then
+      docker buildx build --platform linux/amd64 --load -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+    else
+      echo "Error: docker buildx not available; cannot build amd64 image." >&2
+      echo "Enable Buildx:" >&2
+      echo "  docker buildx create --use --name cs147-builder" >&2
+      echo "  docker buildx inspect --bootstrap" >&2
+      exit 1
+    fi
+  else
+    docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+  fi
   echo "Docker image '$IMAGE_NAME' is ready."
   ensure_student_name "$preset_name"
   if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
