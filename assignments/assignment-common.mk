@@ -27,7 +27,6 @@ LAST_ZIP_MARKER := $(ASSIGNMENT_DIR)/.last_submit_zip
 .PHONY: submit
 ifndef CUSTOM_SUBMIT
 submit:
-	@echo "[submit] running tests for $(ASSIGNMENT_NAME)..."
 	@set +e; test_rc=0; \
 	(cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh $(ASSIGNMENT_NAME) | tee "$(ASSIGNMENT_DIR)/submission_report.log"'); \
 	test_rc=$$?; set -e; \
@@ -39,12 +38,12 @@ submit:
 	@echo "[submit] computing hashes..."
 	@report_body="$(ASSIGNMENT_DIR)/submission_report.body.log"; \
 	cp "$(ASSIGNMENT_DIR)/submission_report.log" "$$report_body"; \
-	hash_patterns="-name '*.v' -o -name '*.sv'"; \
-	if [ "$(ASSIGNMENT_NAME)" = "hw04" ]; then \
-	  hash_patterns="$$hash_patterns -o -name '*.asm' -o -name '*.txt'"; \
-	fi; \
 	(cd "$(ASSIGNMENT_DIR)" && \
-	  files="$$(find . -type f \( $$hash_patterns \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
+	  if [ "$(ASSIGNMENT_NAME)" = "hw04" ]; then \
+	    files="$$(find . -type f \( -name '*.v' -o -name '*.sv' -o -name '*.asm' -o -name '*.txt' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
+	  else \
+	    files="$$(find . -type f \( -name '*.v' -o -name '*.sv' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
+	  fi; \
 	  if [ -n "$$files" ]; then \
 	    printf "%s\n" "$$files" | LC_ALL=C sort | xargs sha256sum; \
 	  fi; \
