@@ -74,6 +74,10 @@ print_help() {
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
 
+  [HW4 Tools]
+    ./run assemble <in> <out>    Run the WISC assembler (writes <out>_*.img and <out>.lst).
+    ./run simulate <img>         Run the WISC simulator on a loadfile image.
+
   [Student Info]
     ./run student_name           View/update the recorded student name.
 
@@ -98,6 +102,16 @@ fi
 if [ "${1:-}" = "test" ]; then
   shift
   exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
+fi
+
+if [ "${1:-}" = "assemble" ]; then
+  shift
+  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/assembler/assemble.sh "$@"
+fi
+
+if [ "${1:-}" = "simulate" ]; then
+  shift
+  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
 fi
 
 case "${1:-}" in
@@ -224,6 +238,10 @@ if [ "${1:-}" = "setup" ]; then
   docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
   echo "Docker image '$IMAGE_NAME' is ready."
   ensure_student_name
+  if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
+    echo "Compiling assembler classes..."
+    docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
+  fi
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"
   echo "============================================================"
