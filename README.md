@@ -17,6 +17,7 @@ Important Notes:
 - If any changes need to be made to the repository, an alert will be sent to all students. Recover the changes with `git pull`.
 - If any changes need to be made to the docker containers used in this project, do the above, then re-run `./run setup`. If this fails for any reason, try running `./run clean docker`, and re-run. If this fails, contact the instructor.
 - If the installation fails during `./run setup`, run `git pull` and retry.
+- HW4 tooling is available via `./run assemble <in> <out>` (assembler) and `./run simulate <img>` (simulator).
 
 ### Setup (Windows)
 Set up WSL (You can skip this if you have already set up WSL)

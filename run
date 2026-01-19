@@ -83,10 +83,14 @@ print_help() {
   [Student Info]
     ./run student_name           View/update the recorded student name.
 
+  [Utilities]
+    ./run makeexecutable <path>  Mark a file executable (chmod +x).
+
   [Cleanup]
     ./run clean logs             Remove local self-test logs (and other clean target items).
     ./run clean docker           Remove toolchain/autograder images (prompts; optional config cleanup).
     ./run clean turnins          Delete generated submission archives (prompts).
+    ./run clean student          Reset saved student name (config.json).
     ./run clean all              Run all clean_* targets (default if no subcommand).
 EOF
 }
@@ -114,6 +118,37 @@ fi
 if [ "${1:-}" = "simulate" ]; then
   shift
   exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
+fi
+
+if [ "${1:-}" = "makeexecutable" ]; then
+  shift
+  if [ $# -ne 1 ]; then
+    echo "Usage: ./run makeexecutable <path>" >&2
+    exit 1
+  fi
+  target_input="$1"
+  if [ "${target_input#/}" = "$target_input" ]; then
+    target_path="$PWD/$target_input"
+  else
+    target_path="$target_input"
+  fi
+  target_dir="$(cd "$(dirname "$target_path")" && pwd -P)"
+  target_base="$(basename "$target_path")"
+  target_path="$target_dir/$target_base"
+  case "$target_path/" in
+    "$REPO_ROOT/"*) ;;
+    *)
+      echo "Error: path must be inside repo: $target_path" >&2
+      exit 1
+      ;;
+  esac
+  if [ ! -e "$target_path" ]; then
+    echo "Error: file not found: $target_path" >&2
+    exit 1
+  fi
+  chmod +x "$target_path"
+  echo "[makeexecutable] chmod +x $target_path"
+  exit 0
 fi
 
 case "${1:-}" in
@@ -193,6 +228,7 @@ case "${1:-}" in
       logs)      make_target="clean_logs" ;;
       docker)    make_target="clean_docker" ;;
       turnins)   make_target="clean_turnins" ;;
+      student)   make_target="clean_student_name" ;;
       all)       make_target="clean" ;;
       *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
     esac
@@ -205,8 +241,47 @@ case "${1:-}" in
     ;;
 esac
 
+get_student_name_host() {
+  python3 - "$CONFIG_FILE_HOST" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    name = data.get("student", {}).get("current_name", "") or ""
+    print(name)
+except FileNotFoundError:
+    print("")
+PY
+}
+
+set_student_name_host() {
+  python3 - "$CONFIG_FILE_HOST" "$1" <<'PY'
+import json, sys
+path = sys.argv[1]
+name = sys.argv[2]
+try:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
+data.setdefault("student", {})
+data["student"]["current_name"] = name
+data.setdefault("previous_names", data.get("student", {}).get("previous_names", []))
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, sort_keys=False)
+    f.write("\n")
+PY
+}
+
 ensure_student_name() {
   # Uses container python, so call after image exists.
+  local preset_name="${1:-}"
+  if [ -n "$preset_name" ]; then
+    docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" set --name "$preset_name"
+    echo "Recorded student name: $preset_name"
+    return
+  fi
   current_name="$(docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" current 2>/dev/null || true)"
   if [ -n "$current_name" ]; then
     echo "Student name: $current_name"
@@ -224,6 +299,30 @@ ensure_student_name() {
 
 if [ "${1:-}" = "setup" ]; then
   shift
+  preset_name=""
+  existing_name="$(get_student_name_host)"
+  if [ -n "$existing_name" ]; then
+    echo "Student name: $existing_name"
+    printf "Change name? [y/N]: "
+    read -r change_name
+    case "$change_name" in
+      y|Y|yes|YES)
+        ;;
+      *)
+        preset_name="$existing_name"
+        ;;
+    esac
+  fi
+  if [ -z "$preset_name" ]; then
+    while [ -z "$preset_name" ]; do
+      printf "Enter your name (for submissions): "
+      read -r preset_name
+      if [ -z "$preset_name" ]; then
+        echo "Name cannot be empty." >&2
+      fi
+    done
+  fi
+  set_student_name_host "$preset_name"
   while [ $# -gt 0 ]; do
     case "$1" in
       --test-force=*)
@@ -236,10 +335,16 @@ if [ "${1:-}" = "setup" ]; then
     esac
     shift
   done
+  if [ -f "$REPO_ROOT/assignments/tools/assembler/assemble.sh" ]; then
+    chmod +x "$REPO_ROOT/assignments/tools/assembler/assemble.sh"
+  fi
+  if [ -f "$REPO_ROOT/assignments/tools/simulator/wiscalculator" ]; then
+    chmod +x "$REPO_ROOT/assignments/tools/simulator/wiscalculator"
+  fi
   echo "Building Docker image '$IMAGE_NAME'..."
   docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
   echo "Docker image '$IMAGE_NAME' is ready."
-  ensure_student_name
+  ensure_student_name "$preset_name"
   if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
     echo "Compiling assembler classes..."
     docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
@@ -275,6 +380,14 @@ if [ "${1:-}" = "setup" ]; then
   if ls "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
     echo "Saved logs:"
     ls -1 "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log
+    zip_path="$SELFTEST_LOG_DIR/selftest_logs.zip"
+    if command -v zip >/dev/null 2>&1; then
+      rm -f "$zip_path"
+      (cd "$SELFTEST_LOG_DIR" && zip -q "selftest_logs.zip" .testing_selftest_attempt*.log >/dev/null 2>&1)
+      if [ -f "$zip_path" ]; then
+        echo "Log bundle: $zip_path"
+      fi
+    fi
   fi
   echo "------------------------------------------------------------"
   exit 1

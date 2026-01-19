@@ -12,6 +12,11 @@ cs147-verilog-toolchain.img
 **/*.out
 dump.vcd
 **/dump.vcd
+*.img
+**/*.img
+*.lst
+**/*.lst
+assignments/tools/assembler/*.class
 submission_report.log
 **/.last_submit_zip
 
@@ -27,6 +32,7 @@ assignments/.testing/Gradescope_Autograder_Template/failed tests/*
 assignments/hw*/Gradescope_Autograder_Template/failed tests/*
 assignments/.testing/Gradescope_Autograder_Template/local_results/*
 assignments/.testing/selftest_logs/*
+assignments/.testing/selftest_logs/selftest_logs.zip
 assignments/.testing/waves/*
 
 # Local self-test logs

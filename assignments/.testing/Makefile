@@ -47,11 +47,15 @@ submit:
 	    asm_path="/repo/assignments/tools/assembler/assemble.sh"; \
 	    if [ -x "$$asm_path" ]; then \
 	      asm_src="$$tmpdir/asm_smoke.asm"; \
+	      asm_log="$$tmpdir/asm_smoke.log"; \
 	      printf "halt\n" >"$$asm_src"; \
-	      if "$$asm_path" "$$asm_src" "$$tmpdir/asm_smoke" >/dev/null 2>&1; then \
+	      if "$$asm_path" "$$asm_src" "$$tmpdir/asm_smoke" >"$$asm_log" 2>&1; then \
 	        echo "  [OK] Assembler smoke test"; \
 	      else \
 	        echo "  [FAIL] Assembler smoke test"; \
+	        if [ -s "$$asm_log" ]; then \
+	          sed 's/^/    /' "$$asm_log"; \
+	        fi; \
 	        primary_status="fail"; \
 	      fi; \
 	    else \
