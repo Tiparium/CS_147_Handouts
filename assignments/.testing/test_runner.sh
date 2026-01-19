@@ -110,6 +110,7 @@ run_assignment() {
       fi
       case "$(basename "$subdir")" in
         hw4_1)
+          rm -f archsim.trace archsim.ptrace
           if [ ! -f "p1.txt" ]; then
             echo "[WARN] $(basename "$subdir"): p1.txt missing (manual grading expected)."
           else
@@ -119,6 +120,7 @@ run_assignment() {
           fi
           ;;
         hw4_2)
+          rm -f archsim.trace archsim.ptrace
           if [ ! -f "p2.txt" ]; then
             echo "[WARN] $(basename "$subdir"): p2.txt missing (manual grading expected)."
           else
