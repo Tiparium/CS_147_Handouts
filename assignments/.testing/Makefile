@@ -107,6 +107,8 @@ run_secondary() { \
   check_cmd git; \
   check_cmd python3; \
   check_cmd pip3; \
+  check_cmd java; \
+  check_cmd javac; \
 	  check_cmd zip; \
 	  check_cmd unzip; \
 	  check_cmd tree; \
