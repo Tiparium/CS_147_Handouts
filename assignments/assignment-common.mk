@@ -48,7 +48,7 @@ submit:
 	  if [ -n "$$files" ]; then \
 	    printf "%s\n" "$$files" | LC_ALL=C sort | xargs sha256sum; \
 	  fi; \
-	  report_hash="$$(sha256sum \"$$report_body\" | awk '{print $$1}')"; \
+	  report_hash="$$(sha256sum "$$report_body" | awk '{print $$1}')"; \
 	  echo "$$report_hash  submission_report.log"; \
 	) >"$(ASSIGNMENT_DIR)/hashes.tmp"; \
 	rm -f "$$report_body"

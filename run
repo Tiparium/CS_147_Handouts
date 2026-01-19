@@ -227,6 +227,7 @@ case "${1:-}" in
         else
           "$REPO_ROOT/run" submit "$hw" || rc=$?
         fi
+        echo
       done
       exit $rc
     fi
