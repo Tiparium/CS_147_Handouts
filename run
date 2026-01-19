@@ -72,7 +72,7 @@ print_help() {
 
   [Tests & Submission]
     ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
-    ./run submit <assignment>    Run the assignment submit flow (runs tests, zips, optional host autograder).
+    ./run submit <assignment|all> Run the assignment submit flow (runs tests, zips, optional host autograder).
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
 
@@ -191,14 +191,36 @@ case "${1:-}" in
         -justgrade) justgrade="1" ;;
         -v|--verbose) submit_verbose="1" ;;
         -vh) submit_hash_verbose="1" ;;
+        all) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
         hw[0-9]*) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
         *) extra_make_args+=("$1") ;;
       esac
       shift
     done
     if [ -z "$assignment_arg" ]; then
-      echo "[submit] assignment name required (e.g., hw01 or hw1)" >&2
+      echo "[submit] assignment name required (e.g., hw01, hw1, or all)" >&2
       exit 1
+    fi
+    if [ "$assignment_arg" = "all" ]; then
+      submit_flags=()
+      [ "$nograde" = "1" ] && submit_flags+=("-nograde")
+      [ "$justgrade" = "1" ] && submit_flags+=("-justgrade")
+      [ "$submit_verbose" = "1" ] && submit_flags+=("-v")
+      [ "$submit_hash_verbose" = "1" ] && submit_flags+=("-vh")
+      if [ ${#extra_make_args[@]} -gt 0 ]; then
+        submit_flags+=("${extra_make_args[@]}")
+      fi
+      mapfile -t assignments < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+      if [ ${#assignments[@]} -eq 0 ]; then
+        echo "[submit] no assignments found under $REPO_ROOT/assignments" >&2
+        exit 1
+      fi
+      rc=0
+      for hw in "${assignments[@]}"; do
+        echo "[submit] running submit for $hw..."
+        "$REPO_ROOT/run" submit "${submit_flags[@]}" "$hw" || rc=$?
+      done
+      exit $rc
     fi
     # Normalize hw number (accept hw1 or hw01)
     case "$assignment_arg" in

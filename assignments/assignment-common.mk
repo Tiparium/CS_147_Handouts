@@ -37,13 +37,21 @@ submit:
 	@# Capture verbose test output separately for debugging (not shown to user)
 	@set +e; (cd "$(ASSIGNMENTS_ROOT)" && bash -lc 'set -o pipefail; ./.testing/test_runner.sh -v $(ASSIGNMENT_NAME) > "$(ASSIGNMENT_DIR)/submission_report_verbose.log"'); set -e
 	@echo "[submit] computing hashes..."
-	@(cd "$(ASSIGNMENT_DIR)" && \
-	  files="$$(find . -type f \( -name '*.v' -o -name '*.sv' \) -print)"; \
+	@report_body="$(ASSIGNMENT_DIR)/submission_report.body.log"; \
+	cp "$(ASSIGNMENT_DIR)/submission_report.log" "$$report_body"; \
+	hash_patterns="-name '*.v' -o -name '*.sv'"; \
+	if [ "$(ASSIGNMENT_NAME)" = "hw04" ]; then \
+	  hash_patterns="$$hash_patterns -o -name '*.asm' -o -name '*.txt'"; \
+	fi; \
+	(cd "$(ASSIGNMENT_DIR)" && \
+	  files="$$(find . -type f \( $$hash_patterns \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
 	  if [ -n "$$files" ]; then \
 	    printf "%s\n" "$$files" | LC_ALL=C sort | xargs sha256sum; \
-	  else \
-	    :; \
-	  fi) >"$(ASSIGNMENT_DIR)/hashes.tmp"
+	  fi; \
+	  report_hash="$$(sha256sum \"$$report_body\" | awk '{print $$1}')"; \
+	  echo "$$report_hash  submission_report.log"; \
+	) >"$(ASSIGNMENT_DIR)/hashes.tmp"; \
+	rm -f "$$report_body"
 	@if [ "${AG_HASH_VERBOSE}" = "1" ]; then \
 	  echo "================ HASH REPORT (pre-zip) ================"; \
 	  cat "$(ASSIGNMENT_DIR)/hashes.tmp"; \
