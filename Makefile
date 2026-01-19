@@ -140,10 +140,15 @@ nuke_docker:
 clean_logs:
 	@rm -f .testing_selftest_attempt*.log
 	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
-	@find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete
+	@rm -f assignments/.testing/selftest_logs/selftest_logs.zip
+	@find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' -o -name '*.img' -o -name '*.lst' \) -delete
 	@echo "Removed logs, VCDs, and bench outputs under assignments/."
 
-CLEAN_STEPS := clean_turnins clean_docker clean_logs
+clean_student_name:
+	@rm -f config.json
+	@echo "Student name cleared (config.json removed)."
+
+CLEAN_STEPS := clean_turnins clean_docker clean_logs clean_student_name
 
 clean:
 	@cleaned=""; skipped=""; \
@@ -185,15 +190,6 @@ clean:
 			          read ansd ; \
 			          case $$ansd in y|Y) echo "$$dang" | xargs -r docker rmi -f >/dev/null ;; *) ;; esac; \
 			        fi; \
-			        echo -n "Remove personal info from config.json? (recommended: no) [y/N] " ; read ans2 ; \
-			        case $$ans2 in \
-			          y|Y) if command -v python3 >/dev/null 2>&1; then \
-			                  python3 "$(CONFIG_SCRIPT)" --config "$(CONFIG_FILE)" clear-student && echo "Cleared student info."; \
-			                else \
-			                  echo "python3 not found; skipping personal info cleanup."; \
-			                fi ;; \
-			          *) echo "Personal info preserved."; ;; \
-			        esac; \
 			        cleaned="$$cleaned $$tgt" ;; \
 		        *) echo "Docker clean skipped."; skipped="$$skipped $$tgt" ;; \
 		      esac; \
@@ -201,10 +197,16 @@ clean:
 		  clean_logs) \
 		    echo -n "Clean log files? [y/N] " ; read ans ; \
 		    case $$ans in \
-		      y|Y) rm -f .testing_selftest_attempt*.log assignments/.testing/selftest_logs/.testing_selftest_attempt*.log; \
-		           find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' \) -delete; \
+		      y|Y) rm -f .testing_selftest_attempt*.log assignments/.testing/selftest_logs/.testing_selftest_attempt*.log assignments/.testing/selftest_logs/selftest_logs.zip; \
+		           find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' -o -name '*.img' -o -name '*.lst' \) -delete; \
 		           echo "Logs cleaned."; cleaned="$$cleaned $$tgt" ;; \
 		      *) echo "Logs skipped."; skipped="$$skipped $$tgt" ;; \
+		    esac ;; \
+		  clean_student_name) \
+		    echo -n "Reset saved student name? [y/N] " ; read ans ; \
+		    case $$ans in \
+		      y|Y) rm -f config.json ; echo "Student name cleared."; cleaned="$$cleaned $$tgt" ;; \
+		      *) echo "Student name reset skipped."; skipped="$$skipped $$tgt" ;; \
 		    esac ;; \
 		esac; \
 	done; \

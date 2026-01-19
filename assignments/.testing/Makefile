@@ -34,6 +34,37 @@ submit:
 	}; \
 	run_mux_tests() { \
 	  primary_status="pass"; \
+	  check_tool() { \
+	    label="$$1"; path="$$2"; \
+	    if [ -x "$$path" ]; then \
+	      echo "  [OK] $$label"; \
+	    else \
+	      echo "  [FAIL] $$label (missing or not executable: $$path)"; \
+	      primary_status="fail"; \
+	    fi; \
+	  }; \
+	  asm_smoke() { \
+	    asm_path="/repo/assignments/tools/assembler/assemble.sh"; \
+	    if [ -x "$$asm_path" ]; then \
+	      asm_src="$$tmpdir/asm_smoke.asm"; \
+	      asm_log="$$tmpdir/asm_smoke.log"; \
+	      printf "halt\n" >"$$asm_src"; \
+	      if "$$asm_path" "$$asm_src" "$$tmpdir/asm_smoke" >"$$asm_log" 2>&1; then \
+	        echo "  [OK] Assembler smoke test"; \
+	      else \
+	        echo "  [FAIL] Assembler smoke test"; \
+	        if [ -s "$$asm_log" ]; then \
+	          sed 's/^/    /' "$$asm_log"; \
+	        fi; \
+	        primary_status="fail"; \
+	      fi; \
+	    else \
+	      echo "  [FAIL] Assembler (missing or not executable: $$asm_path)"; \
+	      primary_status="fail"; \
+	    fi; \
+	  }; \
+	  check_tool "Simulator (wiscalculator)" "/repo/assignments/tools/simulator/wiscalculator"; \
+	  asm_smoke; \
 	  run_mux() { \
 	    name="$$1"; tb="$$2"; src="$$3"; \
 	    sanitized_name=$$(printf '%s' "$$name" | tr ' ' '_'); \
@@ -107,6 +138,8 @@ run_secondary() { \
   check_cmd git; \
   check_cmd python3; \
   check_cmd pip3; \
+  check_cmd java; \
+  check_cmd javac; \
 	  check_cmd zip; \
 	  check_cmd unzip; \
 	  check_cmd tree; \
