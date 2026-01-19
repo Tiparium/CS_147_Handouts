@@ -58,6 +58,7 @@ if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
 fi
 SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
 source "$REPO_ROOT/scripts/spinner.sh"
+DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
 
 print_help() {
   cat <<'EOF'
@@ -96,22 +97,22 @@ fi
 
 if [ "${1:-}" = "verilog_checker" ]; then
   shift
-  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
 fi
 
 if [ "${1:-}" = "test" ]; then
   shift
-  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
 fi
 
 if [ "${1:-}" = "assemble" ]; then
   shift
-  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/assembler/assemble.sh "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/assembler/assemble.sh "$@"
 fi
 
 if [ "${1:-}" = "simulate" ]; then
   shift
-  exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
 fi
 
 case "${1:-}" in
@@ -149,7 +150,7 @@ case "${1:-}" in
       set -- "$assignment_arg"
     fi
     # Run submit inside the container first.
-    docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
+    docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
       -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
       -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
     rc=$?
@@ -199,13 +200,13 @@ case "${1:-}" in
     ;;
   student_name|wave_test)
     target="$1"; shift
-    exec docker run --rm ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$target" "$@"
+    exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;
 esac
 
 ensure_student_name() {
   # Uses container python, so call after image exists.
-  current_name="$(docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" current 2>/dev/null || true)"
+  current_name="$(docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" current 2>/dev/null || true)"
   if [ -n "$current_name" ]; then
     echo "Student name: $current_name"
     return
@@ -216,7 +217,7 @@ ensure_student_name() {
     echo "Name cannot be empty." >&2
     exit 1
   fi
-  docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" set --name "$new_name"
+  docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" python3 "$CONFIG_SCRIPT_CONT" --config "$CONFIG_FILE_CONT" set --name "$new_name"
   echo "Recorded student name: $new_name"
 }
 
@@ -240,7 +241,7 @@ if [ "${1:-}" = "setup" ]; then
   ensure_student_name
   if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
     echo "Compiling assembler classes..."
-    docker run --rm -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
+    docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
   fi
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"
@@ -251,7 +252,7 @@ if [ "${1:-}" = "setup" ]; then
   while [ $attempt -le 3 ]; do
     echo "---------------- attempt $attempt/3 ----------------"
     log_file="$SELFTEST_LOG_DIR/.testing_selftest_attempt${attempt}.log"
-    if run_with_spinner "Self-test attempt $attempt" bash -lc "docker run --rm -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
+    if run_with_spinner "Self-test attempt $attempt" bash -lc "docker run --rm $DOCKER_PLATFORM_FLAG -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
       cat "$log_file"
       echo "============================================================"
       echo "[SELF-TEST] PASS"
@@ -289,7 +290,7 @@ fi
 
 if [ "$1" = "shell" ]; then
   shift
-  exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
 fi
 
-exec docker run --rm "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" "$@"
+exec docker run --rm $DOCKER_PLATFORM_FLAG "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" "$@"
