@@ -16,6 +16,8 @@ dump.vcd
 **/*.img
 *.lst
 **/*.lst
+archsim.trace
+archsim.ptrace
 assignments/tools/assembler/*.class
 submission_report.log
 **/.last_submit_zip
