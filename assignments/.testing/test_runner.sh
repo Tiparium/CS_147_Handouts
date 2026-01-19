@@ -145,7 +145,7 @@ run_assignment() {
           rm -rf "$tmpdir"
           continue
         fi
-        if grep -qiE "unknown opcode|unknown register specifier|error opening|could not open|error in assemble" "$asm_log"; then
+        if grep -qiE "unknown opcode|unknown register specifier|couldn't parse immediate value|bad hex number|labels must end with a colon|error opening|could not open|error in assemble" "$asm_log"; then
           sub_errors=$((sub_errors + 1))
           if [ "$VERBOSE" -eq 1 ]; then
             cat "$asm_log"
