@@ -91,6 +91,7 @@ print_help() {
 
   [Cleanup]
     ./run clean logs             Remove local self-test logs (and other clean target items).
+    ./run clean ta               Remove root-level *.out artifacts.
     ./run clean docker           Remove toolchain/autograder images (prompts; optional config cleanup).
     ./run clean turnins          Delete generated submission archives (prompts).
     ./run clean student          Reset saved student name (config.json).
@@ -275,8 +276,9 @@ case "${1:-}" in
       docker)    make_target="clean_docker" ;;
       turnins)   make_target="clean_turnins" ;;
       student)   make_target="clean_student_name" ;;
+      ta)        make_target="clean_ta" ;;
       all)       make_target="clean" ;;
-      *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
+      *) echo "Usage: ./run clean [logs|docker|turnins|student|ta|all]" >&2; exit 1 ;;
     esac
     shift || true
     exec make "$make_target" "$@"

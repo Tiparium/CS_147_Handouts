@@ -6,7 +6,7 @@ AUTOGRADER_IMAGE_NAME ?= gradescope/autograder-base
 CONFIG_FILE := $(CURDIR)/config.json
 CONFIG_SCRIPT := $(CURDIR)/student_config.py
 
-.PHONY: submit clean_turnins clean_docker nuke_docker clean student_name help -h wave_test $(ASSIGNMENTS)
+.PHONY: submit clean_turnins clean_docker clean_ta nuke_docker clean student_name help -h wave_test $(ASSIGNMENTS)
 
 submit:
 	@if [ -z "$(ASSIGNMENT)" ]; then \
@@ -27,6 +27,7 @@ help -h:
 	@echo "  make wave_test            - generate VCD waveforms for .testing mux examples"
 	@echo "  make clean_turnins        - delete generated submission archives (prompts)"
 	@echo "  make clean_docker         - remove local Docker images (toolchain + autograder base) (prompts; optional config cleanup)"
+	@echo "  make clean_ta             - remove root-level *.out artifacts"
 	@echo "  make nuke_docker          - forcibly remove only the toolchain/autograder images (cache) (prompts)"
 	@echo "  make clean                - run all clean_* targets and remove local self-test logs"
 	@echo "  make -h / make help       - show this help"
@@ -138,11 +139,16 @@ nuke_docker:
 	echo "Done. Note: other Docker images were not touched."
 
 clean_logs:
+	@$(MAKE) clean_ta >/dev/null
 	@rm -f .testing_selftest_attempt*.log
 	@rm -f assignments/.testing/selftest_logs/.testing_selftest_attempt*.log
 	@rm -f assignments/.testing/selftest_logs/selftest_logs.zip
 	@find assignments -type f \( -name '*.vcd' -o -name '*.log' -o -name '*.out' -o -name '*.img' -o -name '*.lst' \) -delete
 	@echo "Removed logs, VCDs, and bench outputs under assignments/."
+
+clean_ta:
+	@rm -f *.out
+	@echo "Removed root-level .out artifacts."
 
 clean_student_name:
 	@rm -f config.json
