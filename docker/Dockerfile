@@ -15,7 +15,7 @@ RUN apt-get update && \
     tree \
     vim \
     docker.io \
-    openjdk-17-jre-headless && \
+    openjdk-17-jdk-headless && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
