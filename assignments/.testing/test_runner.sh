@@ -134,6 +134,8 @@ run_assignment() {
         sim_log="${asm_base}_sim.log"
         tmpdir="$(mktemp -d)"
         out_prefix="$tmpdir/${asm_base}_loadfile"
+        : >"$asm_log"
+        : >"$sim_log"
         if [ "$VERBOSE" -eq 1 ]; then
           echo "============================================================"
           echo "[ASM] $(basename "$subdir") / $asm"
