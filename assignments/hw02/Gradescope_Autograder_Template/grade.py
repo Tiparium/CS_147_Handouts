@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 VERBOSE = os.environ.get("AG_VERBOSE", os.environ.get("VERBOSE", "0")) not in ("0", "", "false", "False", None)
 HASH_VERBOSE = os.environ.get("AG_HASH_VERBOSE", "0") not in ("0", "", "false", "False", None)
@@ -69,6 +69,27 @@ def parse_hash_block(report_path: Path) -> Tuple[Dict[str, str], List[str]]:
     return hashes, lines
 
 
+def _hash_report_body(report_path: Path) -> Optional[str]:
+    if not report_path.exists():
+        return None
+    data = report_path.read_text(errors="ignore")
+    lines = data.splitlines(keepends=True)
+    body_lines = []
+    in_hash = True
+    for line in lines:
+        stripped = line.strip()
+        if in_hash:
+            if not stripped:
+                continue
+            parts = stripped.split(None, 1)
+            if len(parts) == 2 and all(c in "0123456789abcdef" for c in parts[0].lower()):
+                continue
+            in_hash = False
+        body_lines.append(line)
+    body = "".join(body_lines)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     out: Dict[str, str] = {}
     files = sorted(submission_root.rglob("*.v")) + sorted(submission_root.rglob("*.sv"))
@@ -77,6 +98,9 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
         with path.open("rb") as f:
             digest = hashlib.sha256(f.read()).hexdigest()
         out[rel] = digest
+    report_hash = _hash_report_body(submission_root / "submission_report.log")
+    if report_hash:
+        out["submission_report.log"] = report_hash
     return out
 
 

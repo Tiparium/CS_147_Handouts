@@ -72,7 +72,8 @@ print_help() {
 
   [Tests & Submission]
     ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
-    ./run submit <assignment>    Run the assignment submit flow (runs tests, zips, optional host autograder).
+    ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
+    ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
 
@@ -91,6 +92,7 @@ print_help() {
 
   [Cleanup]
     ./run clean logs             Remove local self-test logs (and other clean target items).
+    ./run clean ta               Remove root-level *.out artifacts.
     ./run clean docker           Remove toolchain/autograder images (prompts; optional config cleanup).
     ./run clean turnins          Delete generated submission archives (prompts).
     ./run clean student          Reset saved student name (config.json).
@@ -176,8 +178,9 @@ if [ "${1:-}" = "makeexecutable" ]; then
 fi
 
 case "${1:-}" in
-  submit)
-    target="$1"; shift
+  build_submission|submit)
+    target="submit"
+    shift
     nograde="0"
     justgrade="0"
     submit_verbose="0"
@@ -191,14 +194,43 @@ case "${1:-}" in
         -justgrade) justgrade="1" ;;
         -v|--verbose) submit_verbose="1" ;;
         -vh) submit_hash_verbose="1" ;;
+        all) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
         hw[0-9]*) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
         *) extra_make_args+=("$1") ;;
       esac
       shift
     done
     if [ -z "$assignment_arg" ]; then
-      echo "[submit] assignment name required (e.g., hw01 or hw1)" >&2
+      echo "[submit] assignment name required (e.g., hw01, hw1, or all)" >&2
       exit 1
+    fi
+    if [ "$assignment_arg" = "all" ]; then
+      submit_flags=()
+      [ "$nograde" = "1" ] && submit_flags+=("-nograde")
+      [ "$justgrade" = "1" ] && submit_flags+=("-justgrade")
+      [ "$submit_verbose" = "1" ] && submit_flags+=("-v")
+      [ "$submit_hash_verbose" = "1" ] && submit_flags+=("-vh")
+      if [ ${#extra_make_args[@]} -gt 0 ]; then
+        submit_flags+=("${extra_make_args[@]}")
+      fi
+      assignments=()
+      while IFS= read -r hw; do
+        [ -n "$hw" ] && assignments+=("$hw")
+      done < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+      if [ ${#assignments[@]} -eq 0 ]; then
+        echo "[submit] no assignments found under $REPO_ROOT/assignments" >&2
+        exit 1
+      fi
+      rc=0
+      for hw in "${assignments[@]}"; do
+        if [ ${#submit_flags[@]} -gt 0 ]; then
+          "$REPO_ROOT/run" submit "${submit_flags[@]}" "$hw" || rc=$?
+        else
+          "$REPO_ROOT/run" submit "$hw" || rc=$?
+        fi
+        echo
+      done
+      exit $rc
     fi
     # Normalize hw number (accept hw1 or hw01)
     case "$assignment_arg" in
@@ -253,8 +285,9 @@ case "${1:-}" in
       docker)    make_target="clean_docker" ;;
       turnins)   make_target="clean_turnins" ;;
       student)   make_target="clean_student_name" ;;
+      ta)        make_target="clean_ta" ;;
       all)       make_target="clean" ;;
-      *) echo "Usage: ./run clean [logs|docker|turnins|all]" >&2; exit 1 ;;
+      *) echo "Usage: ./run clean [logs|docker|turnins|student|ta|all]" >&2; exit 1 ;;
     esac
     shift || true
     exec make "$make_target" "$@"

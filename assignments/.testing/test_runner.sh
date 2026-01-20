@@ -289,6 +289,8 @@ if [ "$assignment" = "all" ]; then
   done
 else
   assignment="$(normalize_assignment "$assignment")"
+  echo "============================================================"
+  echo "[ASSIGNMENT] $assignment"
   run_assignment "$assignment" "$subproblem"
 fi
 echo "================================================"
