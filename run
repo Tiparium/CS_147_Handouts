@@ -72,7 +72,8 @@ print_help() {
 
   [Tests & Submission]
     ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
-    ./run submit <assignment|all> Run the assignment submit flow (runs tests, zips, optional host autograder).
+    ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
+    ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
 
@@ -177,8 +178,9 @@ if [ "${1:-}" = "makeexecutable" ]; then
 fi
 
 case "${1:-}" in
-  submit)
-    target="$1"; shift
+  build_submission|submit)
+    target="submit"
+    shift
     nograde="0"
     justgrade="0"
     submit_verbose="0"
