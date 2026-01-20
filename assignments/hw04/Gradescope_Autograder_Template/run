@@ -212,7 +212,11 @@ try:
     print("***********************")
     if auto_msgs:
         print("[autograder_messages]")
-        print(auto_msgs)
+        try:
+            for idx, msg in enumerate(auto_msgs, 1):
+                print(f"{idx}) {msg}")
+        except Exception:
+            print(auto_msgs)
     if hash_verbose and hash_lines_full:
         print("----- HASH REPORT (from grader_output) -----")
         for ln in hash_lines_full:

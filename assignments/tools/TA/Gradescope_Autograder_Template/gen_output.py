@@ -30,14 +30,16 @@ def parse_scores(text: str) -> Tuple[Optional[float], Optional[float], Optional[
     return raw, curved, final
 
 
-def parse_autograder_messages(text: str) -> str:
-    messages = []
+def parse_autograder_messages(text: str) -> list[str]:
     for line in text.splitlines():
-        if line.startswith("autograder_message="):
-            msg = line.split("=", 1)[1]
-            messages.append(msg)
-    joined = "\n".join(messages)
-    return joined.replace("\\n", "\n").strip()
+        if line.startswith("autograder_messages="):
+            payload = line.split("=", 1)[1].strip()
+            try:
+                parsed = json.loads(payload)
+            except json.JSONDecodeError:
+                return []
+            return parsed if isinstance(parsed, list) else []
+    return []
 
 
 def parse_total_points(text: str) -> Optional[float]:
