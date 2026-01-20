@@ -273,11 +273,17 @@ case "${1:-}" in
     echo "[submit] running host autograder..."
     (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "test_submissions/$zip_name")
     grade_rc=$?
-    turnin_path="$REPO_ROOT/generated_turnins/$assignment_arg/$zip_name"
-    if [ -f "$turnin_path" ]; then
-      echo "Submission zip: $turnin_path"
+    turnin_path="generated_turnins/$assignment_arg/$zip_name"
+    if [ -f "$REPO_ROOT/$turnin_path" ]; then
+      echo "-------------------------------"
+      echo "[submit] submission zip ready:"
+      echo "  $turnin_path"
+      echo "-------------------------------"
     else
-      echo "Submission zip: $grader_dir/test_submissions/$zip_name"
+      echo "-------------------------------"
+      echo "[submit] submission zip ready:"
+      echo "  assignments/$assignment_arg/Gradescope_Autograder_Template/test_submissions/$zip_name"
+      echo "-------------------------------"
     fi
     echo "[submit] cleaning autograder artifacts..."
     (cd "$grader_dir" && make clean >/dev/null 2>&1 || true)
