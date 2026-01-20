@@ -30,6 +30,16 @@ def parse_scores(text: str) -> Tuple[Optional[float], Optional[float], Optional[
     return raw, curved, final
 
 
+def parse_autograder_messages(text: str) -> str:
+    messages = []
+    for line in text.splitlines():
+        if line.startswith("autograder_message="):
+            msg = line.split("=", 1)[1]
+            messages.append(msg)
+    joined = "\n".join(messages)
+    return joined.replace("\\n", "\n").strip()
+
+
 def parse_total_points(text: str) -> Optional[float]:
     m = re.search(r"Total points:\s*([0-9]+(?:\.[0-9]+)?)", text)
     if m:
@@ -53,6 +63,7 @@ def main() -> None:
 
     text = in_path.read_text(errors="ignore") if in_path.is_file() else ""
     raw, curved, final = parse_scores(text)
+    auto_msgs = parse_autograder_messages(text)
     parsed_total = parse_total_points(text)
     total_points = float(parsed_total if parsed_total is not None else args.total_points)
 
@@ -68,6 +79,7 @@ def main() -> None:
         "score": float(final_points),
         "visibility": "visible",
         "stdout_visibility": "visible",
+        "autograder_messages": auto_msgs,
         "tests": [
             {
                 "name": args.assignment_name,

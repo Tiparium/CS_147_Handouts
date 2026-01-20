@@ -233,10 +233,12 @@ def main() -> int:
     print(f"Curve note  : {timing_flag}")
     print(f"Curved pct  : {curved_percent:.2f}%")
     print(f"Final score : {final_score:.2f} / {total_pts:.2f}")
-    print("[PLACEHOLDER]:")
-    print("If you see this, this assignment has not yet received official points.")
-    print("Try running [git pull], followed by [./run setup] to grab any updates and retry.")
-    print("If this does not fix the problem, the TA has not yet implemented the grader.")
+    print(
+        "autograder_message=[PLACEHOLDER]:\\n"
+        "If you see this, this assignment has not yet received official points.\\n"
+        "Try running [git pull], followed by [./run setup] to grab any updates and retry.\\n"
+        "If this does not fix the problem, the TA has not yet implemented the grader."
+    )
     print("-----------------------")
     for note in notes:
         print(note)
