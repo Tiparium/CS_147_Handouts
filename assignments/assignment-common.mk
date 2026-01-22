@@ -1,7 +1,7 @@
 ASSIGNMENT_NAME ?= unknown
 REPO_ROOT := $(abspath $(CURDIR)/../..)
 CONFIG_FILE := $(REPO_ROOT)/config.json
-CONFIG_SCRIPT := $(REPO_ROOT)/student_config.py
+CONFIG_SCRIPT := $(REPO_ROOT)/scripts/student_config.py
 ASSIGNMENTS_ROOT := $(REPO_ROOT)/assignments
 TURNINS_ROOT := $(REPO_ROOT)/generated_turnins
 ASSIGNMENT_DIR ?= $(ASSIGNMENTS_ROOT)/$(ASSIGNMENT_NAME)
