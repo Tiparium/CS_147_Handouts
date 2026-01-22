@@ -90,7 +90,7 @@ run_assignment() {
         echo "------------------------------------------------------------"
         echo "[CMD] verilog_checker $subdir"
       fi
-      if ! bash /repo/verilog_checker.sh "$subdir" >"$checker_log" 2>&1; then
+      if ! bash /repo/scripts/verilog_checker/verilog_checker.sh "$subdir" >"$checker_log" 2>&1; then
         checker_status=1
         [ "$VERBOSE" -eq 1 ] && cat "$checker_log"
       else
