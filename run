@@ -3,10 +3,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+# Support Docker-in-Docker: if HOST_REPO_ROOT is set, we're inside a container
+# REPO_ROOT = host path (for Docker volume mounts)
+# LOCAL_REPO_ROOT = container path (for local file access)
+if [ -n "${HOST_REPO_ROOT:-}" ]; then
+  REPO_ROOT="$HOST_REPO_ROOT"
+  LOCAL_REPO_ROOT="/repo"
+else
+  REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+  LOCAL_REPO_ROOT="$REPO_ROOT"
+fi
 IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
-CONFIG_FILE_HOST="$REPO_ROOT/config.json"
-CONFIG_SCRIPT_HOST="$REPO_ROOT/scripts/student_config.py"
+CONFIG_FILE_HOST="$LOCAL_REPO_ROOT/config.json"
+CONFIG_SCRIPT_HOST="$LOCAL_REPO_ROOT/scripts/student_config.py"
 CONFIG_FILE_CONT="/repo/config.json"
 CONFIG_SCRIPT_CONT="/repo/scripts/student_config.py"
 TEST_FORCE=""
@@ -27,18 +36,23 @@ if [ -z "$REPO_ROOT" ]; then
   exit 1
 fi
 
-case "$PWD/" in
-  "$REPO_ROOT/"*) ;;
-  *)
-    echo "Error: current directory ($PWD) is not inside the repository root ($REPO_ROOT)." >&2
-    exit 1
-    ;;
-esac
-
-REL_PATH="${PWD#"$REPO_ROOT"}"
-REL_PATH="${REL_PATH#/}"
-WORKDIR="/repo"
-[ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
+# Skip PWD validation when inside container (using HOST_REPO_ROOT)
+if [ -z "${HOST_REPO_ROOT:-}" ]; then
+  case "$PWD/" in
+    "$REPO_ROOT/"*) ;;
+    *)
+      echo "Error: current directory ($PWD) is not inside the repository root ($REPO_ROOT)." >&2
+      exit 1
+      ;;
+  esac
+  REL_PATH="${PWD#"$REPO_ROOT"}"
+  REL_PATH="${REL_PATH#/}"
+  WORKDIR="/repo"
+  [ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
+else
+  # Inside container: use current directory relative to /repo
+  WORKDIR="$PWD"
+fi
 
 DOCKER_SOCK_VOLUME=()
 if [ -S /var/run/docker.sock ]; then
@@ -56,8 +70,8 @@ SOCK_OPTS=()
 if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
   SOCK_OPTS=("${DOCKER_SOCK_VOLUME[@]}")
 fi
-SELFTEST_LOG_DIR="$REPO_ROOT/assignments/.testing/selftest_logs"
-source "$REPO_ROOT/scripts/spinner.sh"
+SELFTEST_LOG_DIR="$LOCAL_REPO_ROOT/assignments/.testing/selftest_logs"
+source "$LOCAL_REPO_ROOT/scripts/spinner.sh"
 DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
 SIM_PLATFORM_FLAG="${SIM_PLATFORM_FLAG:---platform linux/amd64}"
 
@@ -243,7 +257,7 @@ case "${1:-}" in
     fi
     # Run submit inside the container first.
     docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
-      -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
+      -e HOST_REPO_ROOT="$REPO_ROOT" -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
       -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
     rc=$?
     if [ $rc -ne 0 ]; then
@@ -306,7 +320,7 @@ case "${1:-}" in
     ;;
   student_name|wave_test)
     target="$1"; shift
-    exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" make "$target" "$@"
+    exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -e HOST_REPO_ROOT="$REPO_ROOT" -w /repo "$IMAGE_NAME" make "$target" "$@"
     ;;
 esac
 
