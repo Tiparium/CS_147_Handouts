@@ -453,7 +453,7 @@ if [ "${1:-}" = "setup" ]; then
   while [ $attempt -le 3 ]; do
     echo "---------------- attempt $attempt/3 ----------------"
     log_file="$SELFTEST_LOG_DIR/.testing_selftest_attempt${attempt}.log"
-    if run_with_spinner "Self-test attempt $attempt" bash -lc "docker run --rm $DOCKER_PLATFORM_FLAG -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
+    if run_with_spinner "Self-test attempt $attempt" bash -c "docker run --rm $DOCKER_PLATFORM_FLAG -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
       cat "$log_file"
       echo "============================================================"
       echo "[SELF-TEST] PASS"
