@@ -4,7 +4,7 @@ ASSIGNMENT := $(firstword $(filter-out submit,$(MAKECMDGOALS)))
 DOCKER_IMAGE_NAME ?= cs147-verilog-toolchain
 AUTOGRADER_IMAGE_NAME ?= gradescope/autograder-base
 CONFIG_FILE := $(CURDIR)/config.json
-CONFIG_SCRIPT := $(CURDIR)/student_config.py
+CONFIG_SCRIPT := $(CURDIR)/scripts/student_config.py
 
 .PHONY: submit clean_turnins clean_docker clean_ta nuke_docker clean student_name help -h wave_test $(ASSIGNMENTS)
 
@@ -221,14 +221,14 @@ clean:
 	echo "  skipped: $$skipped"
 
 student_name:
-	@./run python3 student_config.py --config /repo/config.json summary
+	@./run python3 scripts/student_config.py --config /repo/config.json summary
 	@echo -n "Change name? [y/N] " ; \
 	  read ans ; \
 	  case $$ans in \
 	    y|Y) read -rp "Enter new name: " newname ; \
 	         if [ -z "$$newname" ]; then echo "Name cannot be empty."; exit 1; fi ; \
-	         ./run python3 student_config.py --config /repo/config.json set --name "$$newname" ; \
-	         ./run python3 student_config.py --config /repo/config.json summary ;; \
+	         ./run python3 scripts/student_config.py --config /repo/config.json set --name "$$newname" ; \
+	         ./run python3 scripts/student_config.py --config /repo/config.json summary ;; \
 	    *) echo "No changes made."; ;; \
 	  esac
 

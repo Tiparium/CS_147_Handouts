@@ -127,7 +127,7 @@ run_secondary() { \
   check_python_module() { \
     if python3 -c "import importlib,sys; mod=sys.argv[1]; importlib.import_module(mod); print(f'  [OK] python module: {mod}')" "$$1"; then :; else echo "  [FAIL] python module missing: $$1"; secondary_status=fail; fi; \
   }; \
-  if bash /repo/verilog_checker.sh "$(ASSIGNMENT_DIR)" >/dev/null 2>&1; then \
+  if bash /repo/scripts/verilog_checker/verilog_checker.sh "$(ASSIGNMENT_DIR)" >/dev/null 2>&1; then \
     echo "  [OK] Verilog Syntax Checker"; \
   else \
     echo "  [FAIL] Verilog Syntax Checker"; \

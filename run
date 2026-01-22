@@ -6,9 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
 CONFIG_FILE_HOST="$REPO_ROOT/config.json"
-CONFIG_SCRIPT_HOST="$REPO_ROOT/student_config.py"
+CONFIG_SCRIPT_HOST="$REPO_ROOT/scripts/student_config.py"
 CONFIG_FILE_CONT="/repo/config.json"
-CONFIG_SCRIPT_CONT="/repo/student_config.py"
+CONFIG_SCRIPT_CONT="/repo/scripts/student_config.py"
 TEST_FORCE=""
 
 # Normalize paths on MSYS/Git Bash (Windows)
@@ -74,7 +74,7 @@ print_help() {
     ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
     ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
     ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
-    ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see verilog_checker.sh for details).
+    ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see scripts/verilog_checker/verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
 
   [HW4 Tools]
@@ -107,7 +107,7 @@ fi
 
 if [ "${1:-}" = "verilog_checker" ]; then
   shift
-  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/verilog_checker.sh "$@"
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/scripts/verilog_checker/verilog_checker.sh "$@"
 fi
 
 if [ "${1:-}" = "test" ]; then

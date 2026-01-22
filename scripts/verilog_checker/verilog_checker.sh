@@ -6,8 +6,9 @@ set -euo pipefail
 #   verilog_checker <assignment>       # runs recursively over all .v under assignments/<assignment>
 #   verilog_checker <path>             # if file: only that .v; if dir: .v files in that dir (non-recursive)
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHECKER_DIR="$REPO_ROOT/verilog_checker"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+CHECKER_DIR="$SCRIPT_DIR"
 ASSIGNMENTS="hw01 hw02 hw03 hw04 hw05 hw06 lab project .testing"
 
 if ! command -v java >/dev/null 2>&1; then
