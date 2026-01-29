@@ -1,0 +1,261 @@
+\documentclass[11pt]{article}
+
+% --------------------
+% Packages
+% --------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{courier}
+\usepackage{titlesec}
+\usepackage{setspace}
+
+% --------------------
+% Global spacing tweaks
+% --------------------
+\setstretch{1.15}                 % overall line spacing
+\setlist[itemize]{itemsep=0.4em}  % bullet spacing
+
+% --------------------
+% Section formatting
+% --------------------
+\titleformat{\section}
+  {\large\bfseries}
+  {\thesection.}
+  {0.75em}
+  {}
+
+\titleformat{\subsection}
+  {\normalsize\bfseries}
+  {}
+  {0em}
+  {}
+
+\titlespacing*{\section}{0pt}{2.0em}{1.0em}
+\titlespacing*{\subsection}{0pt}{1.2em}{0.6em}
+
+% --------------------
+% Code formatting
+% --------------------
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  xleftmargin=1em,
+  xrightmargin=1em
+}
+
+% --------------------
+% Document
+% --------------------
+\begin{document}
+
+\begin{center}
+{\Large \textbf{CS 147 — Verilog Usage Rules}}\\[0.75em]
+Spring 2026\\
+\vspace{0.5em}
+\textit{Adapted from CS/ECE 552 Verilog Rules}\\
+\textit{Original author: Andy Phelps (CS 552, Spring 2006)}\\
+Last Modified: January 2026
+\end{center}
+
+\vspace{1.5em}
+
+\tableofcontents
+\newpage
+
+% ==========================================================
+\section{Introduction}
+
+In \textbf{CS 147}, you are restricted to a carefully chosen subset of the
+Verilog hardware description language. This document defines and explains
+those restrictions.
+
+This is \emph{not} a complete Verilog reference. Instead, it is intended
+to guide you toward writing Verilog that closely reflects real hardware
+structures and design practices.
+
+For full language references, consult:
+\begin{itemize}
+  \item Online Verilog HDL Quick Reference Guide
+  \item ASIC World Verilog Quick Reference
+\end{itemize}
+
+% ==========================================================
+\section{Justification for These Limitations}
+
+The goal of these restrictions is to force you to \textbf{think like a
+hardware designer}, not a software programmer.
+
+While Verilog can be used in a highly abstract, C-like manner, doing so
+provides little educational value in an introductory architecture course.
+
+Limiting the language:
+\begin{itemize}
+  \item Encourages schematic-accurate thinking
+  \item Prevents simulation-order–dependent bugs
+  \item Produces designs that synthesize reliably
+  \item Mirrors constraints commonly imposed in industry
+\end{itemize}
+
+Design your Verilog as if you were verbally describing real hardware
+components and their connections.
+
+% ==========================================================
+\section{Allowed Keywords}
+
+Verilog keywords for this course fall into three categories:
+\begin{itemize}
+  \item \textbf{Always Allowed}
+  \item \textbf{Allowed with Stipulations}
+  \item \textbf{Never Allowed}
+\end{itemize}
+
+This list is not guaranteed to be exhaustive. When in doubt, ask a TA
+\emph{before} using a construct.
+
+\subsection*{Keywords Allowed with Stipulations}
+
+The following rules apply \textbf{only} to keywords in this category:
+
+\begin{itemize}
+  \item \texttt{case}, \texttt{casex}
+    \begin{itemize}
+      \item A \texttt{default} clause is required
+      \item If the default executes, an error must be asserted
+      \item Large case statements (\(\sim\)12 lines or more) must be placed in their own module
+    \end{itemize}
+
+  \item \texttt{reg}
+    \begin{itemize}
+      \item May only be used for outputs of a case statement
+    \end{itemize}
+
+  \item \texttt{always}
+    \begin{itemize}
+      \item May only be used to introduce a case statement
+    \end{itemize}
+
+  \item \texttt{begin} / \texttt{end}
+    \begin{itemize}
+      \item May only wrap the body of a case statement
+    \end{itemize}
+\end{itemize}
+
+% ==========================================================
+\section{Allowed Operators}
+
+You are restricted to simple boolean and structural operators.
+
+\begin{itemize}
+  \item Shift operators are allowed \textbf{only} with constant shift amounts
+  \item The ternary operator (\texttt{a ? b : c}) is allowed and encouraged
+  \item Concatenation (\texttt{\{a,b\}}) and reduction operators are allowed
+  \item Equality (\texttt{==}) and inequality (\texttt{!=}) are permitted
+\end{itemize}
+
+\subsection*{Explicitly Forbidden}
+
+The following categories of operators are \textbf{not allowed}:
+\begin{itemize}
+  \item Arithmetic: \texttt{+ - * / \%}
+  \item Relational: \texttt{< > <= >=}
+\end{itemize}
+
+\subsection*{Operator Summary}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\ttfamily}l l | >{\ttfamily}l l}
+\toprule
+\multicolumn{2}{c|}{\textbf{Allowed}} & \multicolumn{2}{c}{\textbf{Not Allowed}} \\
+\midrule
+\textasciitilde m & Inversion      & m + n & Addition \\
+m \& n            & Bitwise AND    & m - n & Subtraction \\
+m | n             & Bitwise OR     & m * n & Multiplication \\
+m \textasciicircum n & Bitwise XOR & m / n & Division \\
+\&m               & AND Reduction  & m \% n & Modulus \\
+m == n            & Equality       & m \&\& n & Logical AND \\
+m != n            & Inequality     & m || n & Logical OR \\
+m << const        & Shift Left     & m < n & Less Than \\
+m >> const        & Shift Right    & m > n & Greater Than \\
+test ? m:n        & Ternary        &       & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ==========================================================
+\section{Usage Examples}
+
+All hardware designs in this course consist of:
+\begin{itemize}
+  \item \textbf{Combinational logic}
+  \item \textbf{State}, implemented using D flip-flops
+\end{itemize}
+
+All state must be held in provided D flip-flop modules with synchronous
+reset. Do \emph{not} create custom flip-flops using procedural tricks.
+
+\subsection*{Combinational Logic}
+
+Combinational logic should primarily be expressed using \texttt{assign}
+statements:
+
+\begin{lstlisting}
+assign xyz = a & b;
+\end{lstlisting}
+
+\subsection*{Module Structure}
+
+Modules should follow a clear, consistent structure:
+
+\begin{lstlisting}
+module my_module_name(param1, param2);
+  input  param1;
+  output param2;
+
+  wire [7:0] signalName;
+
+  assign signalName = expression;
+
+  submodule instance(
+    .input0(param1),
+    .output0(param2)
+  );
+endmodule
+\end{lstlisting}
+
+\subsection*{Case Statement Example}
+
+\begin{lstlisting}
+always @* case (s)
+  2'b00: out = i0;
+  2'b01: out = i1;
+  2'b10: out = i2;
+  2'b11: out = i3;
+endcase
+\end{lstlisting}
+
+\textbf{Important:} Every output must be assigned in every case. Failure
+to do so will infer latches and produce incorrect hardware.
+
+% ==========================================================
+\section{Verilog Check Program}
+
+Your designs will be scanned using the \texttt{Vcheck} program to detect
+illegal constructs. You are required to run it and submit the output.
+
+Available methods:
+\begin{itemize}
+  \item \texttt{java Vcheck < myfile.v}
+  \item \texttt{vcheck.sh < myfile.v}
+  \item \texttt{vcheck-all.sh}
+\end{itemize}
+
+\end{document}

@@ -27,23 +27,29 @@ normalize_hw() {
 }
 
 for raw_hw in "$@"; do
-  hw="$(normalize_hw "$raw_hw")"
-  writeup_dir="$ASSIGNMENTS_ROOT/$hw/writeup"
+  if [ "$raw_hw" = "rules" ]; then
+    writeup_dir="/repo/assignments/tools/verilog_rules"
+    label="rules"
+  else
+    hw="$(normalize_hw "$raw_hw")"
+    writeup_dir="$ASSIGNMENTS_ROOT/$hw/writeup"
+    label="$hw"
+  fi
   if [ ! -d "$writeup_dir" ]; then
-    echo "[writeup] Skipping $hw (no writeup directory)."
+    echo "[writeup] Skipping $label (no writeup directory)."
     continue
   fi
   shopt -s nullglob
   tex_files=("$writeup_dir"/*.tex)
   shopt -u nullglob
   if [ "${#tex_files[@]}" -eq 0 ]; then
-    echo "[writeup] Skipping $hw (no .tex files)."
+    echo "[writeup] Skipping $label (no .tex files)."
     continue
   fi
   for tex in "${tex_files[@]}"; do
     tex_base="$(basename "$tex")"
     tex_stem="${tex_base%.tex}"
-    echo "[writeup] Building $hw/$tex_base"
+    echo "[writeup] Building $label/$tex_base"
     # Clear stale latexmk state without touching the PDF.
     rm -f "$writeup_dir/$tex_stem.aux" "$writeup_dir/$tex_stem.fdb_latexmk" \
       "$writeup_dir/$tex_stem.fls" "$writeup_dir/$tex_stem.log" \

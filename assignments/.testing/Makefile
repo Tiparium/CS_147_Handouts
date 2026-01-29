@@ -148,21 +148,21 @@ run_secondary() { \
 	}; \
 run_ta_tools() { \
   ta_tools_status=pass; \
-  if command -v latexmk >/dev/null 2>&1; then \
-    tex_dir="$$tmpdir/latex_check"; \
-    mkdir -p "$$tex_dir"; \
-    printf '%s\n' '\documentclass{article}' '\begin{document}' 'latex check' '\end{document}' >"$$tex_dir/latex_check.tex"; \
-    if latexmk -pdf -interaction=nonstopmode -halt-on-error "$$tex_dir/latex_check.tex" >"$$tex_dir/latex_check.log" 2>&1; then \
-      echo "  [OK] Latex Toolkit"; \
-    else \
-      echo "  [FAIL] Latex Toolkit (build failed)"; \
-      if [ -s "$$tex_dir/latex_check.log" ]; then \
-        sed 's/^/    /' "$$tex_dir/latex_check.log"; \
-      fi; \
-      ta_tools_status=fail; \
-    fi; \
+  rules_dir="/repo/assignments/tools/verilog_rules"; \
+  if [ ! -d "$$rules_dir" ]; then \
+    echo "  [FAIL] Latex Toolkit (rules directory missing: $$rules_dir)"; \
+    ta_tools_status=fail; \
+    return; \
+  fi; \
+  if [ ! -f "$$rules_dir/verilog_rules.tex" ]; then \
+    echo "  [FAIL] Latex Toolkit (rules source missing: $$rules_dir/verilog_rules.tex)"; \
+    ta_tools_status=fail; \
+    return; \
+  fi; \
+  if bash /repo/scripts/writeup/build_writeup.sh rules >/dev/null 2>&1; then \
+    echo "  [OK] Latex Toolkit"; \
   else \
-    echo "  [FAIL] Latex Toolkit (latexmk missing)"; \
+    echo "  [FAIL] Latex Toolkit (rules PDF build failed)"; \
     ta_tools_status=fail; \
   fi; \
 }; \

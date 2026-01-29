@@ -28,10 +28,16 @@ To run the testbench programs that we have distributed for this lab, use:
 \item Replace \texttt{<homework>} with the assignment name (e.g., \texttt{hw1}).
 \item The \texttt{[problem]} argument is optional. If omitted, all tests for the selected homework assignment will be run.
 \item For more detailed output, add \texttt{-v} (e.g., \texttt{./run test -v hw1 hw1\_1}).
+\begin{itemize}
+\item \textbf{Warning:} \texttt{-v} output can be extremely long in some contexts.
+\end{itemize}
 \end{itemize}
 
+\section*{Verilog Rules}
+Read the Verilog rules document at \texttt{assignments/tools/verilog\_rules/verilog\_rules.pdf} and adhere to the conventions.
+Rules adherence will be checked when you run \texttt{./run test}.
+
 \section*{Submission Instructions}
-Read the Verilog rules document in the assignments folder (see \texttt{Verilog Rules.pdf}) and adhere to the conventions.
 
 To build a submission for grading, run:
 \begin{itemize}
@@ -40,7 +46,7 @@ To build a submission for grading, run:
 through the integrated autograder.
 \item A submission ZIP is created in \texttt{generated\_turnins/<assignment>/}.
 \item If you run \texttt{build\_submission} multiple times for the same assignment, the generated zip files will be prepended with a number. The most recent submission should be the item with the highest number.
-\item IMPORTANT: Running \texttt{./run build\_submission <assignment>} DOES NOT actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
+\item \textbf{IMPORTANT:} Running \texttt{./run build\_submission <assignment>} \textbf{DOES NOT} actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
 \end{itemize}
 
 \section*{Problem 1}
