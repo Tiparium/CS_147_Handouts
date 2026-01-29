@@ -50,13 +50,17 @@ run_assignment() {
   if [ -n "$subproblem" ]; then
     subdirs=("$hw_dir/$subproblem")
   else
-    mapfile -t subdirs < <(find "$hw_dir" -maxdepth 1 -mindepth 1 -type d ! -name "Gradescope_Autograder_Template" | sort)
+    mapfile -t subdirs < <(find "$hw_dir" -maxdepth 1 -mindepth 1 -type d ! -name "Gradescope_Autograder_Template" ! -name "writeup" | sort)
   fi
 
   for subdir in "${subdirs[@]}"; do
     if [ ! -d "$subdir" ]; then
       echo "Skipping missing subproblem: $subdir" >&2
       overall_status=1
+      continue
+    fi
+    if [ "$(basename "$subdir")" = "writeup" ]; then
+      [ "$VERBOSE" -eq 1 ] && echo "[SKIP] writeup directory (no tests or Vcheck)."
       continue
     fi
 

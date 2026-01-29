@@ -59,13 +59,17 @@ run_dir_recursive() {
     if ! run_file "$f"; then
       status=1
     fi
-  done < <(find "$dir" -type f -name '*.v' | sort)
+  done < <(find "$dir" \( -name "writeup" -o -name "Gradescope_Autograder_Template" \) -prune -o -type f -name '*.v' -print | sort)
   return $status
 }
 
 run_dir_non_recursive() {
   local dir="$1"
   local status=0
+  if [ "$(basename "$dir")" = "writeup" ]; then
+    echo "Skipping writeup directory (no Vcheck)."
+    return 0
+  fi
   for f in "$dir"/*.v; do
     [ -e "$f" ] || continue
     if ! run_file "$f"; then
