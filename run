@@ -385,6 +385,25 @@ with open(path, "w", encoding="utf-8") as f:
 PY
 }
 
+ensure_config_writable() {
+  local cfg_path="$1"
+  local cfg_dir
+  cfg_dir="$(dirname "$cfg_path")"
+  if [ -e "$cfg_path" ]; then
+    if [ ! -w "$cfg_path" ]; then
+      echo "Error: config.json is not writable: $cfg_path" >&2
+      echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$cfg_path\" && chmod u+rw \"$cfg_path\"" >&2
+      exit 1
+    fi
+  else
+    if [ ! -w "$cfg_dir" ]; then
+      echo "Error: config.json cannot be created in: $cfg_dir" >&2
+      echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$cfg_dir\"" >&2
+      exit 1
+    fi
+  fi
+}
+
 ensure_student_name() {
   # Uses container python, so call after image exists.
   local preset_name="${1:-}"
@@ -433,6 +452,7 @@ if [ "${1:-}" = "setup" ]; then
       fi
     done
   fi
+  ensure_config_writable "$CONFIG_FILE_HOST"
   set_student_name_host "$preset_name"
   while [ $# -gt 0 ]; do
     case "$1" in
