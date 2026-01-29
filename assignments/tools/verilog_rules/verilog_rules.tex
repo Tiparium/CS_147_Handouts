@@ -4,21 +4,20 @@
 % Packages
 % --------------------
 \usepackage[margin=1in]{geometry}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{enumitem}
 \usepackage{array}
 \usepackage{booktabs}
-\usepackage{xcolor}
-\usepackage{listings}
-\usepackage{courier}
 \usepackage{titlesec}
 \usepackage{setspace}
+\usepackage{listings}
+\usepackage{courier}
 
 % --------------------
-% Global spacing tweaks
+% Readability tweaks
 % --------------------
-\setstretch{1.15}                 % overall line spacing
-\setlist[itemize]{itemsep=0.4em}  % bullet spacing
+\setstretch{1.15}
+\setlist[itemize]{itemsep=0.35em, topsep=0.35em}
 
 % --------------------
 % Section formatting
@@ -28,15 +27,7 @@
   {\thesection.}
   {0.75em}
   {}
-
-\titleformat{\subsection}
-  {\normalsize\bfseries}
-  {}
-  {0em}
-  {}
-
-\titlespacing*{\section}{0pt}{2.0em}{1.0em}
-\titlespacing*{\subsection}{0pt}{1.2em}{0.6em}
+\titlespacing*{\section}{0pt}{2.0em}{0.9em}
 
 % --------------------
 % Code formatting
@@ -52,20 +43,22 @@
 }
 
 % --------------------
-% Document
+% Helpers
 % --------------------
+\newcommand{\coursename}{CS 147}
+\newcommand{\termname}{Spring 2026}
+
 \begin{document}
 
 \begin{center}
-{\Large \textbf{CS 147 — Verilog Usage Rules}}\\[0.75em]
-Spring 2026\\
-\vspace{0.5em}
-\textit{Adapted from CS/ECE 552 Verilog Rules}\\
-\textit{Original author: Andy Phelps (CS 552, Spring 2006)}\\
+{\Large \textbf{\coursename{} — Verilog Rules}}\\[0.5em]
+\termname\\[0.75em]
+\textit{Adapted from ``Use of Verilog in CS/ECE 552'' (Spring 2008 version)}\\
+\textit{Original document adapted from Andy Phelps (CS552-Sp'06)}\\
 Last Modified: January 2026
 \end{center}
 
-\vspace{1.5em}
+\vspace{1.0em}
 
 \tableofcontents
 \newpage
@@ -73,189 +66,329 @@ Last Modified: January 2026
 % ==========================================================
 \section{Introduction}
 
-In \textbf{CS 147}, you are restricted to a carefully chosen subset of the
-Verilog hardware description language. This document defines and explains
-those restrictions.
+In \coursename{}, you will be limited to a small subset of the complete Verilog language.
+The purpose of this document is to outline and explain these usage restrictions.
+It is not a complete Verilog reference.
 
-This is \emph{not} a complete Verilog reference. Instead, it is intended
-to guide you toward writing Verilog that closely reflects real hardware
-structures and design practices.
-
-For full language references, consult:
+You can consult the following resources for a more complete documentation of the language:
 \begin{itemize}
-  \item Online Verilog HDL Quick Reference Guide
+  \item On-line Verilog HDL Quick Reference Guide
   \item ASIC World Verilog Quick Reference
 \end{itemize}
 
 % ==========================================================
-\section{Justification for These Limitations}
+\section{Justification of Limitation}
 
-The goal of these restrictions is to force you to \textbf{think like a
-hardware designer}, not a software programmer.
+The intention of limiting the Verilog language is to force you to ``think like hardware''.
+Verilog in its full form is a powerful HDL that can very nearly be used as a programming language
+with capabilities similar to C.
 
-While Verilog can be used in a highly abstract, C-like manner, doing so
-provides little educational value in an introductory architecture course.
+While this is useful for experienced designers trying to increase productivity, there is no
+intellectual benefit to be gained by using the abstract features of Verilog. Instead, you will write
+Verilog in a manner that reflects the actual hardware you are trying to design. Think of it as verbally
+describing the components of a schematic sheet.
 
-Limiting the language:
-\begin{itemize}
-  \item Encourages schematic-accurate thinking
-  \item Prevents simulation-order–dependent bugs
-  \item Produces designs that synthesize reliably
-  \item Mirrors constraints commonly imposed in industry
-\end{itemize}
-
-Design your Verilog as if you were verbally describing real hardware
-components and their connections.
+In addition to the educational value of using a subset of the Verilog specification, limiting your code to only
+well-understood constructs will also help to avoid some pitfalls which can lead to hard to find bugs.
+Designing with a limited subset of Verilog will tend to produce good designs which synthesize well; for this
+reason you may be required to follow similar rules when you have a job in industry.
 
 % ==========================================================
 \section{Allowed Keywords}
 
-Verilog keywords for this course fall into three categories:
+Verilog keywords in this course are grouped into three categories: always allowed, allowed with stipulations,
+and never allowed. This list is not guaranteed to be complete. If you are ever in doubt about the use of a
+Verilog keyword consult the TA before proceeding.
+
+\vspace{0.75em}
+
+\subsection*{Verilog Keyword Summary (Table 1)}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{10pt}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|}
+\hline
+\multicolumn{1}{|c|}{\textbf{Always Allowed}} &
+\multicolumn{1}{c|}{\textbf{Allowed with Stipulations}} &
+\multicolumn{1}{c|}{\textbf{Never Allowed}} \\
+\hline
+\ttfamily\footnotesize\parbox[t]{\linewidth}{%
+assign\\
+module\\
+endmodule\\
+input\\
+output\\
+wire\\
+define\\
+parameter}
+&
+\ttfamily\footnotesize\parbox[t]{\linewidth}{%
+case\\
+casex\\
+casez\\
+reg\\
+always\\
+begin\\
+end}
+&
+\ttfamily\footnotesize\parbox[t]{\linewidth}{%
+attribute\\
+buf\\
+bufif0\\
+bufif1\\
+pulldown\\
+pullup\\
+rcmos\\
+real\\
+cmos\\
+deassign\\
+disable\\
+edge\\
+else\\
+endattribute\\
+endfunction\\
+endprimitive\\
+endspecify\\
+endtable\\
+endtask\\
+event\\
+for\\
+forever\\
+fork\\
+function\\
+highz0\\
+highz1\\
+if\\
+ifnone\\
+initial\\
+inout\\
+integer\\
+join\\
+medium\\
+large\\
+macromodule\\
+negedge\\
+nmos\\
+notif0\\
+notif1\\
+pmos\\
+posedge\\
+primitive\\
+pull0\\
+pull1\\
+realtime\\
+release\\
+repeat\\
+rnmos\\
+rpmos\\
+rtran\\
+rtranif0\\
+rtranif1\\
+scalared\\
+signed\\
+small\\
+specify\\
+specparam\\
+strength\\
+strong0\\
+strong1\\
+supply0\\
+supply1\\
+table\\
+task\\
+time\\
+tran\\
+tranif0\\
+tranif1\\
+tri\\
+tri0\\
+tri1\\
+triand\\
+trior\\
+trireg\\
+unsigned\\
+vectored\\
+wait\\
+wand\\
+weak0\\
+weak1\\
+while\\
+wor}
+\\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{1.0em}
+
+\subsection*{Stipulations}
+
+Keywords in the allowed with stipulations group can only be used in conjunction with a case statement.
+The following stipulations apply:
 \begin{itemize}
-  \item \textbf{Always Allowed}
-  \item \textbf{Allowed with Stipulations}
-  \item \textbf{Never Allowed}
-\end{itemize}
-
-This list is not guaranteed to be exhaustive. When in doubt, ask a TA
-\emph{before} using a construct.
-
-\subsection*{Keywords Allowed with Stipulations}
-
-The following rules apply \textbf{only} to keywords in this category:
-
-\begin{itemize}
-  \item \texttt{case}, \texttt{casex}
-    \begin{itemize}
-      \item A \texttt{default} clause is required
-      \item If the default executes, an error must be asserted
-      \item Large case statements (\(\sim\)12 lines or more) must be placed in their own module
-    \end{itemize}
-
-  \item \texttt{reg}
-    \begin{itemize}
-      \item May only be used for outputs of a case statement
-    \end{itemize}
-
-  \item \texttt{always}
-    \begin{itemize}
-      \item May only be used to introduce a case statement
-    \end{itemize}
-
-  \item \texttt{begin} / \texttt{end}
-    \begin{itemize}
-      \item May only wrap the body of a case statement
-    \end{itemize}
+  \item \texttt{case}, \texttt{casex} — the \texttt{default} clause is required. If the default clause is used during
+        execution, an error must be asserted. Large case statements (\(\sim\)12 lines or more) must go in their own module.
+  \item \texttt{reg} — can only be used to specify the outputs of a case statement.
+  \item \texttt{always} — can only be used to introduce a case statement.
+  \item \texttt{begin} — can only be used to introduce a case statement.
+  \item \texttt{end} — can only be used to terminate a case statement.
 \end{itemize}
 
 % ==========================================================
 \section{Allowed Operators}
 
-You are restricted to simple boolean and structural operators.
+In this course you will be limited to using simple boolean logic operators. You may use the shift operators,
+but only by a constant amount (i.e. \texttt{sigY << sigX} is not allowed, but \texttt{sigY << 4} is).
+The ternary operator (\texttt{a ? b : c}) is allowed and even encouraged.
+Concatenation (\texttt{\{bit, bit\}}) and reduction (\texttt{\&a[31:0]}) are allowed.
+Logical equality (\texttt{==}) and inequality (\texttt{!=}) operators are also permitted.
 
-\begin{itemize}
-  \item Shift operators are allowed \textbf{only} with constant shift amounts
-  \item The ternary operator (\texttt{a ? b : c}) is allowed and encouraged
-  \item Concatenation (\texttt{\{a,b\}}) and reduction operators are allowed
-  \item Equality (\texttt{==}) and inequality (\texttt{!=}) are permitted
-\end{itemize}
+You are expressly forbidden from using arithmetic operators (\texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}, \texttt{\%})
+and less-than or greater-than comparisons.
 
-\subsection*{Explicitly Forbidden}
+\vspace{0.75em}
 
-The following categories of operators are \textbf{not allowed}:
-\begin{itemize}
-  \item Arithmetic: \texttt{+ - * / \%}
-  \item Relational: \texttt{< > <= >=}
-\end{itemize}
-
-\subsection*{Operator Summary}
+\subsection*{Operator Summary (Table 2)}
 
 \begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{>{\ttfamily}l l | >{\ttfamily}l l}
-\toprule
-\multicolumn{2}{c|}{\textbf{Allowed}} & \multicolumn{2}{c}{\textbf{Not Allowed}} \\
-\midrule
-\textasciitilde m & Inversion      & m + n & Addition \\
-m \& n            & Bitwise AND    & m - n & Subtraction \\
-m | n             & Bitwise OR     & m * n & Multiplication \\
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{10pt}
+\begin{tabular}{|>{\ttfamily}p{0.18\textwidth} p{0.26\textwidth} | >{\ttfamily}p{0.18\textwidth} p{0.26\textwidth}|}
+\hline
+\multicolumn{2}{|c|}{\textbf{Allowed}} & \multicolumn{2}{c|}{\textbf{Not Allowed}} \\
+\hline
+\textasciitilde m & Inversion & m + n & Addition \\
+m \& n & Bitwise AND & m - n & Subtraction \\
+m | n & Bitwise OR & m * n & Multiplication \\
 m \textasciicircum n & Bitwise XOR & m / n & Division \\
-\&m               & AND Reduction  & m \% n & Modulus \\
-m == n            & Equality       & m \&\& n & Logical AND \\
-m != n            & Inequality     & m || n & Logical OR \\
-m << const        & Shift Left     & m < n & Less Than \\
-m >> const        & Shift Right    & m > n & Greater Than \\
-test ? m:n        & Ternary        &       & \\
-\bottomrule
+m \textasciitilde\textasciicircum n & Bitwise NXOR & m \% n & Modulus \\
+\&m & AND Reduction & -m & Negation (2's Comp) \\
+\textasciitilde\&m & NAND Reduction & m \&\& n & Logical AND \\
+|m & OR Reduction & m || n & Logical OR \\
+\textasciitilde|m & NOR Reduction & m < n & Less Than \\
+\textasciicircum m & XOR Reduction & m > n & Greater Than \\
+\textasciitilde\textasciicircum m & NXOR Reduction & m <= n & Less Than or Equals \\
+m == n & Equality & m >= n & Greater Than or Equals \\
+m != n & Inequality &  &  \\
+m === n & Identity &  &  \\
+m !== n & Not Identical &  &  \\
+m << const & Shift Left* &  &  \\
+m >> const & Shift Right* &  &  \\
+test ? m:n & Ternary &  &  \\
+\{m, n\} & Concatenation &  &  \\
+\{m\{n\}\} & Replication &  &  \\
+\hline
 \end{tabular}
 \end{center}
 
 % ==========================================================
 \section{Usage Examples}
 
-All hardware designs in this course consist of:
-\begin{itemize}
-  \item \textbf{Combinational logic}
-  \item \textbf{State}, implemented using D flip-flops
-\end{itemize}
+The most fundamental thing to keep in mind is that your hardware design will be composed of two things:
+combinational logic, and state. For any moderately complex logic design, state must be handled in an
+organized way. An R-S flipflop would get you laughed out the door of a computer design company! In our
+designs, state will all be held in D-flipflops that are all clocked on the rising edge of a common system clock.
 
-All state must be held in provided D flip-flop modules with synchronous
-reset. Do \emph{not} create custom flip-flops using procedural tricks.
+You are provided (in the course infrastructure) with a module for a single D-flipflop with synchronous reset.
+Instantiate copies of this module to build larger registers. Do not create your own flipflops in some other way.
 
-\subsection*{Combinational Logic}
+Combinational logic will be specified primarily with \texttt{assign} statements. The statement
+\texttt{assign xyz = a \& b;} specifies an AND gate. Assign statements can get long and complex, and can specify
+hundreds of gates, but it always represents some set of flow-through logic that generates the value for a wire
+(or bundle of wires).
 
-Combinational logic should primarily be expressed using \texttt{assign}
-statements:
+Your design will be hierarchical. That means you will write Verilog modules for all the small building blocks of
+your design, and you will instantiate these modules within larger modules.
 
+The modules you write should have a structure like this:
 \begin{lstlisting}
-assign xyz = a & b;
-\end{lstlisting}
-
-\subsection*{Module Structure}
-
-Modules should follow a clear, consistent structure:
-
-\begin{lstlisting}
-module my_module_name(param1, param2);
-  input  param1;
-  output param2;
-
-  wire [7:0] signalName;
-
+module my_module_name(param,param,...param);
+  input  param;
+  output param;
+  wire [msb:lsb] signalName;
   assign signalName = expression;
-
-  submodule instance(
-    .input0(param1),
-    .output0(param2)
-  );
+  modulename instance(param,param...); // call some submodule
 endmodule
 \end{lstlisting}
 
-\subsection*{Case Statement Example}
-
+Note that assign statements can operate on an entire vector of bits at one time. For example:
 \begin{lstlisting}
-always @* case (s)
-  2'b00: out = i0;
-  2'b01: out = i1;
-  2'b10: out = i2;
-  2'b11: out = i3;
+wire [15:0] a,b,ss,ans;
+assign ss  = {16{s}};   // use 16 copies of "s"
+assign ans = (ss ^ a) | b;
+\end{lstlisting}
+
+When instantiating a module, you must name the ports when connecting wires to it. For example:
+\begin{lstlisting}
+mux2_1 m0(d0,d1,s,b)  // is NOT OK
+mux2_1 m0(.input0(d0),.input1(d1),.select(s),.output0(b)) // is CORRECT
+\end{lstlisting}
+
+Case statements are the only situation in this class where you will use statements such as
+\texttt{begin}, \texttt{end}, \texttt{reg}, \texttt{always}. Example:
+\begin{lstlisting}
+wire [1:0] s;
+reg out;
+always @* case(s)
+  2'b00: out=i0;
+  2'b01: out=i1;
+  2'b10: out=i2;
+  2'b11: out=i3;
 endcase
 \end{lstlisting}
 
-\textbf{Important:} Every output must be assigned in every case. Failure
-to do so will infer latches and produce incorrect hardware.
+Here is a larger example:
+\begin{lstlisting}
+wire inputA,inputB,goBack;
+wire [2:0] currentState;
+reg  [2:0] newState;
+reg out,err;
+
+always @(goBack or currentState or inputA or inputB)
+casex({goBack,currentState,inputA,inputB})
+  6'b1_???_?_?: begin out=0; newState=3'b000; err=0; end
+  6'b0_000_0_?: begin out=0; newState=3'b000; err=0; end
+  6'b0_000_1_?: begin out=0; newState=3'b001; err=0; end
+  6'b0_001_1_?: begin out=0; newState=3'b001; err=0; end
+  6'b0_001_0_0: begin out=0; newState=3'b010; err=0; end
+  6'b0_001_0_1: begin out=0; newState=3'b011; err=0; end
+  6'b0_010_?_0: begin out=0; newState=3'b010; err=0; end
+  6'b0_010_?_1: begin out=0; newState=3'b011; err=0; end
+  6'b0_011_?_1: begin out=0; newState=3'b011; err=0; end
+  6'b0_011_?_0: begin out=0; newState=3'b100; err=0; end
+  6'b0_100_?_?: begin out=1; newState=3'b000; err=0; end
+  6'b0_101_?_?: begin out=0; newState=3'b000; err=1; end
+  6'b0_110_?_?: begin out=0; newState=3'b000; err=1; end
+  6'b0_111_?_?: begin out=0; newState=3'b000; err=1; end
+  default:       begin out=0; newState=3'b000; err=1; end
+endcase
+\end{lstlisting}
+
+Also not allowed: any notion of time or delays; any real numbers.
+For statements are OK for debugging but must not appear in a finished assignment.
 
 % ==========================================================
-\section{Verilog Check Program}
+\section{CS 147 Verilog Check Program}
 
-Your designs will be scanned using the \texttt{Vcheck} program to detect
-illegal constructs. You are required to run it and submit the output.
+A Java program \texttt{Vcheck} will be used to scan your design for some of the common illegal constructs.
+You will be required to run it on your Verilog designs and hand in the output.
 
-Available methods:
 \begin{itemize}
-  \item \texttt{java Vcheck < myfile.v}
-  \item \texttt{vcheck.sh < myfile.v}
-  \item \texttt{vcheck-all.sh}
+  \item Method 1: copy \texttt{Vcheck.class} and \texttt{VerFile.class} into a directory, then run:
+\begin{quote}\ttfamily
+java Vcheck < myfile.v
+\end{quote}
+
+  \item Method 2: from a course machine shell prompt, run:
+\begin{quote}\ttfamily
+vcheck.sh < myfile.v
+\end{quote}
+
+  \item Method 3: run on all Verilog files in a directory:
+\begin{quote}\ttfamily
+vcheck-all.sh
+\end{quote}
 \end{itemize}
 
 \end{document}
