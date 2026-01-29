@@ -46,7 +46,12 @@ for raw_hw in "$@"; do
     echo "[writeup] Building $hw/$tex_base"
     # Clear stale latexmk state without touching the PDF.
     rm -f "$writeup_dir/$tex_stem.aux" "$writeup_dir/$tex_stem.fdb_latexmk" \
-      "$writeup_dir/$tex_stem.fls" "$writeup_dir/$tex_stem.log"
+      "$writeup_dir/$tex_stem.fls" "$writeup_dir/$tex_stem.log" \
+      "$writeup_dir/$tex_stem.out" "$writeup_dir/$tex_stem.toc"
     (cd "$writeup_dir" && latexmk -g -pdf -interaction=nonstopmode -halt-on-error "$tex_base")
+    # Clean build artifacts while preserving the PDF and source.
+    rm -f "$writeup_dir/$tex_stem.aux" "$writeup_dir/$tex_stem.fdb_latexmk" \
+      "$writeup_dir/$tex_stem.fls" "$writeup_dir/$tex_stem.log" \
+      "$writeup_dir/$tex_stem.out" "$writeup_dir/$tex_stem.toc"
   done
 done

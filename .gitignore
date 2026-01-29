@@ -10,6 +10,14 @@ cs147-verilog-toolchain.img
 **/*.log
 *.out
 **/*.out
+*.aux
+**/*.aux
+*.fdb_latexmk
+**/*.fdb_latexmk
+*.fls
+**/*.fls
+*.toc
+**/*.toc
 dump.vcd
 **/dump.vcd
 *.img

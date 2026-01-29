@@ -22,19 +22,26 @@ Some advice:  To deal with complexity, use a "divide and conquer" or hierarchica
 
 \section*{Testing Instructions}
 
-To run the testbench programs that we have distributed for this lab, run the following command in the
-top-level folder where you have checked out the code:
-\begin{verbatim}
-./run test hw1 hw1_1
-\end{verbatim}
-
-This will run the test(s) for problem 1. For more help, look at the \texttt{run} script. If you want
-more detailed output, add \texttt{-v} (for example, \texttt{./run test -v hw1 hw1\_1}).
+To run the testbench programs that we have distributed for this lab, use:
+\begin{itemize}
+\item \texttt{./run test <homework> [problem]}
+\item Replace \texttt{<homework>} with the assignment name (e.g., \texttt{hw1}).
+\item The \texttt{[problem]} argument is optional. If omitted, all tests for the selected homework assignment will be run.
+\item For more detailed output, add \texttt{-v} (e.g., \texttt{./run test -v hw1 hw1\_1}).
+\end{itemize}
 
 \section*{Submission Instructions}
 Read the Verilog rules document in the assignments folder (see \texttt{Verilog Rules.pdf}) and adhere to the conventions.
 
-\textbf{Fill this in: How to run the rule checker?  How do I submit?}
+To build a submission for grading, run:
+\begin{itemize}
+\item \texttt{./run build\_submission <assignment>}
+\item This will automatically run \texttt{./run test <assignment>}, then run the generated submission
+through the integrated autograder.
+\item A submission ZIP is created in \texttt{generated\_turnins/<assignment>/}.
+\item If you run \texttt{build\_submission} multiple times for the same assignment, the generated zip files will be prepended with a number. The most recent submission should be the item with the highest number.
+\item IMPORTANT: Running \texttt{./run build\_submission <assignment>} DOES NOT actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
+\end{itemize}
 
 \section*{Problem 1}
 For all parts of this problem, we have provided templates that you can add your code to.  Each problem is in its own directory (e.g., hw1\_1).
