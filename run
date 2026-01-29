@@ -391,15 +391,53 @@ ensure_config_writable() {
   cfg_dir="$(dirname "$cfg_path")"
   if [ -e "$cfg_path" ]; then
     if [ ! -w "$cfg_path" ]; then
-      echo "Error: config.json is not writable: $cfg_path" >&2
-      echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$cfg_path\" && chmod u+rw \"$cfg_path\"" >&2
-      exit 1
+      echo "Warning: config.json is not writable: $cfg_path" >&2
+      if command -v sudo >/dev/null 2>&1; then
+        printf "Fix permissions now using sudo? [y/N]: " >&2
+        read -r fix_confirm
+        case "$fix_confirm" in
+          y|Y|yes|YES)
+            sudo chown "$USER:$USER" "$cfg_path" && chmod u+rw "$cfg_path" || {
+              echo "Error: failed to fix permissions for $cfg_path" >&2
+              exit 1
+            }
+            ;;
+          *)
+            echo "Error: config.json is not writable: $cfg_path" >&2
+            echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$cfg_path\" && chmod u+rw \"$cfg_path\"" >&2
+            exit 1
+            ;;
+        esac
+      else
+        echo "Error: config.json is not writable: $cfg_path" >&2
+        echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$cfg_path\" && chmod u+rw \"$cfg_path\"" >&2
+        exit 1
+      fi
     fi
   else
     if [ ! -w "$cfg_dir" ]; then
-      echo "Error: config.json cannot be created in: $cfg_dir" >&2
-      echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$cfg_dir\"" >&2
-      exit 1
+      echo "Warning: config.json cannot be created in: $cfg_dir" >&2
+      if command -v sudo >/dev/null 2>&1; then
+        printf "Fix permissions now using sudo? [y/N]: " >&2
+        read -r fix_confirm
+        case "$fix_confirm" in
+          y|Y|yes|YES)
+            sudo chown -R "$USER:$USER" "$cfg_dir" || {
+              echo "Error: failed to fix permissions for $cfg_dir" >&2
+              exit 1
+            }
+            ;;
+          *)
+            echo "Error: config.json cannot be created in: $cfg_dir" >&2
+            echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$cfg_dir\"" >&2
+            exit 1
+            ;;
+        esac
+      else
+        echo "Error: config.json cannot be created in: $cfg_dir" >&2
+        echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$cfg_dir\"" >&2
+        exit 1
+      fi
     fi
   fi
 }
