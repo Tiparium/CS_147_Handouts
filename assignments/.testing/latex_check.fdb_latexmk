@@ -1,0 +1,18 @@
+# Fdb version 4
+["pdflatex"] 1769715733.10456 "/tmp/tmp.UJ81cGAp1e/latex_check/latex_check.tex" "latex_check.pdf" "latex_check" 1769715733.46232 0
+  "/etc/texmf/web2c/texmf.cnf" 1769713178 475 c0e671620eb5563b2130f56340a5fde8 ""
+  "/tmp/tmp.UJ81cGAp1e/latex_check/latex_check.tex" 1769715732.8238 68 a194d12976f1d5756191f89cf2a91752 ""
+  "/usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/base/article.cls" 1705352648 20144 147463a6a579f4597269ef9565205cfe ""
+  "/usr/share/texlive/texmf-dist/tex/latex/base/size10.clo" 1705352648 8448 dbc0dbf4156c0bb9ba01a1c685d3bad0 ""
+  "/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def" 1704491087 30006 57b07afb710ee2f649c65cfbafda39c1 ""
+  "/usr/share/texlive/texmf-dist/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
+  "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
+  "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1769713227 5023696 64706d5abb54d87665f9b680ab4fc076 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1769713277 6800794 f3ff81ab5c1a26cd61382da4a70c624b ""
+  "latex_check.aux" 1769715733.4303 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  (generated)
+  "latex_check.aux"
+  "latex_check.log"
+  "latex_check.pdf"
+  (rewritten before read)
