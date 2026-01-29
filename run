@@ -97,6 +97,8 @@ print_help() {
 
   [Debug]
     ./run generate <name>        Run debug generators (e.g., ./run generate tools).
+    ./run generate writeup [hw]  Rebuild writeup PDFs (omit hw to rebuild all).
+    ./run generate writeup rules Rebuild the Verilog rules PDF.
 
   [Student Info]
     ./run student_name           View/update the recorded student name.
@@ -144,7 +146,7 @@ if [ "${1:-}" = "generate" ]; then
   subcmd="${1:-}"
   if [ -z "$subcmd" ]; then
     echo "Usage: ./run generate <name>" >&2
-    echo "Available: tools" >&2
+    echo "Available: tools, writeup" >&2
     exit 1
   fi
   shift || true
@@ -152,9 +154,35 @@ if [ "${1:-}" = "generate" ]; then
     tools)
       exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" /repo/assignments/tools/TA/assembler_simulator_testing/run_tests.sh "$@"
       ;;
+    writeup)
+      target_hw="${1:-}"
+      if [ "$target_hw" = "rules" ]; then
+        exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/scripts/writeup/build_writeup.sh rules
+      fi
+      if [ -z "$target_hw" ]; then
+        echo "[writeup] No assignment specified."
+        echo "[writeup] This will overwrite all existing writeup PDFs."
+        printf "Proceed? [Y/n]: "
+        read -r confirm
+        case "$confirm" in
+          ""|y|Y|yes|YES) ;;
+          *) echo "[writeup] Aborted."; exit 1 ;;
+        esac
+        hw_list=()
+        while IFS= read -r hw; do
+          [ -n "$hw" ] && hw_list+=("$hw")
+        done < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+        if [ ${#hw_list[@]} -eq 0 ]; then
+          echo "[writeup] No assignments found under $REPO_ROOT/assignments." >&2
+          exit 1
+        fi
+        exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/scripts/writeup/build_writeup.sh "${hw_list[@]}"
+      fi
+      exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/scripts/writeup/build_writeup.sh "$target_hw"
+      ;;
     *)
       echo "Unknown generate target: $subcmd" >&2
-      echo "Available: tools" >&2
+      echo "Available: tools, writeup" >&2
       exit 1
       ;;
   esac
@@ -443,6 +471,16 @@ if [ "${1:-}" = "setup" ]; then
   if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
     echo "Compiling assembler classes..."
     docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
+  fi
+  echo "Building Verilog rules PDF..."
+  rules_log="$SELFTEST_LOG_DIR/verilog_rules_build.log"
+  if ! docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/scripts/writeup/build_writeup.sh rules >"$rules_log" 2>&1; then
+    echo "Error: failed to build Verilog rules PDF." >&2
+    if [ -s "$rules_log" ]; then
+      echo "---- Verilog rules build log ----" >&2
+      tail -n 200 "$rules_log" >&2
+    fi
+    exit 1
   fi
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"

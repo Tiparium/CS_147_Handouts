@@ -1,0 +1,113 @@
+\documentclass[12pt]{article}
+\usepackage{fullpage}
+%\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{listings,amssymb}
+\usepackage{listings}
+\usepackage{graphicx,xcolor}
+%\doublespacing
+\usepackage[T1]{fontenc}
+\lstset{numbers=left, numberstyle=\tiny}
+\title{CS 147: Lab 01}
+\author{}
+\date{February 3, 2026}
+\begin{document}
+\maketitle
+%\vspace{-0.5in}
+The main objective of this problem set is to become familiar with using the toolchain for the course project.  
+Feel free to refer
+to the Verilog cheatsheet, Verilog tutorial slides linked off of canvas. 
+
+Some advice:  To deal with complexity, use a "divide and conquer" or hierarchical design approach. Divide the circuit into logical pieces, called blocks, which can be composed to form the larger circuit. For example, a 4-to-1 multiplexor or mux can be composed from 2-to-1 muxes. Hierarchical design reduces both the complexity faced by the designer and the complexity of the computer's representation of the schematic. While hierarchical design may seem unnecessary for something as simple as a 4-to-1 mux, remember that modern computers have millions of gates.
+
+\section*{Testing Instructions}
+
+To run the testbench programs that we have distributed for this lab, use:
+\begin{itemize}
+\item \texttt{./run test <homework> [problem]}
+\item Replace \texttt{<homework>} with the assignment name (e.g., \texttt{hw1}).
+\item The \texttt{[problem]} argument is optional. If omitted, all tests for the selected homework assignment will be run.
+\item For more detailed output, add \texttt{-v} (e.g., \texttt{./run test -v hw1 hw1\_1}).
+\begin{itemize}
+\item \textbf{Warning:} \texttt{-v} output can be extremely long in some contexts.
+\end{itemize}
+\end{itemize}
+
+\section*{Verilog Rules}
+Read the Verilog rules document at \texttt{assignments/tools/verilog\_rules/verilog\_rules.pdf} and adhere to the conventions.
+Rules adherence will be checked when you run \texttt{./run test}.
+
+\section*{Submission Instructions}
+
+To build a submission for grading, run:
+\begin{itemize}
+\item \texttt{./run build\_submission <assignment>}
+\item This will automatically run \texttt{./run test <assignment>}, then run the generated submission
+through the integrated autograder.
+\item A submission ZIP is created in \texttt{generated\_turnins/<assignment>/}.
+\item If you run \texttt{build\_submission} multiple times for the same assignment, the generated zip files will be prepended with a number. The most recent submission should be the item with the highest number.
+\item \textbf{IMPORTANT:} Running \texttt{./run build\_submission <assignment>} \textbf{DOES NOT} actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
+\end{itemize}
+
+\section*{Problem 1}
+For all parts of this problem, we have provided templates that you can add your code to.  Each problem is in its own directory (e.g., hw1\_1).
+\begin{enumerate}
+\item
+Design a 1-bit 2-to-1 multiplexer module called mux2\_1, using only \texttt{NAND}, \texttt{NOR}, and \texttt{NOT} gates.
+Implement the circuit in verilog using the provided basic gate modules. These modules are already included in the downloaded folders. Instantiate them in your module to use them. 
+The input data lines of the multiplexer should be labeled \textit{InA} and \textit{InB}, the select line labeled \textit{S}, and the output labeled \textit{Out}.
+Your module should be named \texttt{mux2\_1} and
+your file should be named \texttt{mux2\_1.v}.
+\item
+Use the 2-to-1 mux you designed in step 1 to hierarchically create a 4-to-1 mux called mux4\_1.
+Label the inputs \textit{InA, InB, InC}, and \textit{InD}, and the output \textit{Out}.
+Make your select input a 2-bit-wide bus (not a single wire); name it \textit{S (1:0)}. (If \textit{S} is \texttt{b00}, \textit{InA} is selected; if \textit{S} is \texttt{b01}, \textit{InB} is selected, etc.)
+\item
+Hierarchically create a quad 4-to-1 mux called quadmux4\_1, using your 4-to-1 mux.
+The inputs to the new mux should be four 4-bit busses labeled \textit{InA (3:0), InB (3:0), InC (3:0)}, and \textit{InD (3:0)}.
+The select bus is labeled \textit{S (1:0)} and the output should be a bus labeled \textit{Out (3:0)}.
+\item
+Use the testbench provided for testing.
+\end{enumerate}
+
+\section*{Problem 2}
+For all parts of this problem, we have provided templates that you can add your code to.  
+I also recommend consulting Appendix B.5-B.6 in your textbook
+if you need help getting started. You may also find B.3 (Combinational Logic) and B.4 (Using HDLs)
+useful. Similar rules apply throughout this problem – you should build your larger combinational logic out
+of the provided \texttt{NOT, NAND, NOR}, and \texttt{XOR} gates. If you need an assign statement to connect
+a single bit (e.g., assign c[0] = c\_in;) that is ok, but larger logic should be using the provided gates.
+
+\begin{enumerate}
+\item
+Design a 1-bit full adder using only the provided \texttt{NOT, NAND, NOR}, and \texttt{XOR} gates
+(you do not have to use all four types of gates, you are just limited to using these gate types). Again
+use the provided modules. Label the inputs as \textit{inA, inB}, and \textit{cIn} (carry-in). Label the outputs as \textit{s}
+and \textit{cOut}. Note that this will look similar to the adder we designed in class. Your module should
+be named \texttt{fullAdder1b} and your file should be named \texttt{fullAdder1b.v}.
+\item
+Optionally (but strongly recommended), verify the correctness of the 1-bit adder over all
+combinations of inputs by writing your own testbench. It is generally best to test at the smallest
+module level first. Given that this module is so small, it should be fairly easy to exhaustively test
+it. I also recommend that you create “self-checking” testbenches that compare the answer of the
+module you designed to the “golden” output that you get from using “+” or “-
+” in the testbench
+(again, it is ok to use these in the testbench, but not in the modules you are designing). See the
+testbench in Step 5 (below) for an example of this.
+\item Using the 1-bit full adder you created above, design a carry lookahead adder (CLA) with the same
+gate restrictions that adds two 4-bit binary numbers. Make the inputs and outputs 4-bit buses
+(vectors) labeled \textit{inA(3:0), inB(3:0)}, and \textit{sum(3:0)}, respectively. Label the carry-in \textit{cIn} and the
+carry-out \textit{cOut}. Your module should be named \texttt{cla4b} and your filename should be \texttt{cla4b.v}.
+\item 
+Using the 4-bit CLA you created above, design a CLA that adds two 16-bit binary numbers with
+the same gate restrictions. Make the inputs and outputs 16-bit buses (vectors) labeled \textit{inA(15:0),
+inB(15:0)}, and \textit{sum(15:0)}, respectively. Label the carry-out from the adder \textit{cOut} and the carry-in
+\textit{cIn}. Your module should be named \texttt{cla16b} and your file should be named \texttt{cla16b.v}.
+\begin{enumerate}
+\item Note: you may add P and G inputs/outputs to your \texttt{cla4b} module for this.
+\end{enumerate}
+\item  Use the testbench provided for testing.
+
+\end{enumerate}
+
+\end{document}
