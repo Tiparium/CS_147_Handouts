@@ -12,6 +12,8 @@
 \usepackage{setspace}
 \usepackage{listings}
 \usepackage{courier}
+\usepackage{multicol}
+\usepackage{needspace}
 
 % --------------------
 % Readability tweaks
@@ -105,9 +107,10 @@ Verilog keyword consult the TA before proceeding.
 \subsection*{Verilog Keyword Summary (Table 1)}
 
 \begin{center}
-\renewcommand{\arraystretch}{1.15}
-\setlength{\tabcolsep}{10pt}
-\begin{tabular}{|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|}
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{6pt}
+\small
+\begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|>{\raggedright\arraybackslash}p{0.26\textwidth}|>{\raggedright\arraybackslash}p{0.40\textwidth}|}
 \hline
 \multicolumn{1}{|c|}{\textbf{Always Allowed}} &
 \multicolumn{1}{c|}{\textbf{Allowed with Stipulations}} &
@@ -133,6 +136,8 @@ begin\\
 end}
 &
 \ttfamily\footnotesize\parbox[t]{\linewidth}{%
+\setlength{\columnsep}{0.6em}%
+\begin{multicols}{2}
 attribute\\
 buf\\
 bufif0\\
@@ -214,7 +219,8 @@ wand\\
 weak0\\
 weak1\\
 while\\
-wor}
+wor
+\end{multicols}}
 \\
 \hline
 \end{tabular}
@@ -247,10 +253,8 @@ Logical equality (\texttt{==}) and inequality (\texttt{!=}) operators are also p
 You are expressly forbidden from using arithmetic operators (\texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}, \texttt{\%})
 and less-than or greater-than comparisons.
 
-\vspace{0.75em}
-
+\begin{samepage}
 \subsection*{Operator Summary (Table 2)}
-
 \begin{center}
 \renewcommand{\arraystretch}{1.2}
 \setlength{\tabcolsep}{10pt}
@@ -281,6 +285,7 @@ test ? m:n & Ternary &  &  \\
 \hline
 \end{tabular}
 \end{center}
+\end{samepage}
 
 % ==========================================================
 \section{Usage Examples}
