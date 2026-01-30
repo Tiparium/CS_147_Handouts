@@ -131,8 +131,6 @@ if [ "${1:-}" = "update" ]; then
   fi
   # Cleanup: remove generated writeup PDFs before pulling.
   find "$REPO_ROOT" -type f -path "*/writeup/*.pdf" -print -delete || exit $?
-  rules_pdf="$REPO_ROOT/assignments/tools/verilog_rules/verilog_rules.pdf"
-  [ -f "$rules_pdf" ] && rm -f "$rules_pdf"
   if ! git -C "$REPO_ROOT" pull; then
     unmerged=$(git -C "$REPO_ROOT" ls-files -u | awk '{print $4}' | sort -u)
     if [ -n "$unmerged" ]; then
@@ -562,16 +560,6 @@ if [ "${1:-}" = "setup" ]; then
   if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
     echo "Compiling assembler classes..."
     docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
-  fi
-  echo "Building Verilog rules PDF..."
-  rules_log="$SELFTEST_LOG_DIR/verilog_rules_build.log"
-  if ! docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/scripts/writeup/build_writeup.sh rules >"$rules_log" 2>&1; then
-    echo "Error: failed to build Verilog rules PDF." >&2
-    if [ -s "$rules_log" ]; then
-      echo "---- Verilog rules build log ----" >&2
-      tail -n 200 "$rules_log" >&2
-    fi
-    exit 1
   fi
   echo "------------------------------------------------------------"
   echo "[SELF-TEST] .testing"

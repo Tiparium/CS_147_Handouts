@@ -146,29 +146,8 @@ run_secondary() { \
 	  check_cmd vim; \
 	  check_python_module diff_match_patch; \
 	}; \
-run_ta_tools() { \
-  ta_tools_status=pass; \
-  rules_dir="/repo/assignments/tools/verilog_rules"; \
-  if [ ! -d "$$rules_dir" ]; then \
-    echo "  [FAIL] Latex Toolkit (rules directory missing: $$rules_dir)"; \
-    ta_tools_status=fail; \
-    return; \
-  fi; \
-  if [ ! -f "$$rules_dir/verilog_rules.tex" ]; then \
-    echo "  [FAIL] Latex Toolkit (rules source missing: $$rules_dir/verilog_rules.tex)"; \
-    ta_tools_status=fail; \
-    return; \
-  fi; \
-  if bash /repo/scripts/writeup/build_writeup.sh rules >/dev/null 2>&1; then \
-    echo "  [OK] Latex Toolkit"; \
-  else \
-    echo "  [FAIL] Latex Toolkit (rules PDF build failed)"; \
-    ta_tools_status=fail; \
-  fi; \
-}; \
 	section "Primary Dependency: iVerilog" primary_status run_mux_tests; \
 	section "Secondary Dependencies" secondary_status run_secondary; \
-	section "TA Tools" ta_tools_status run_ta_tools; \
 	rm -rf "$$tmpdir"; \
 	if [ "$$primary_status" = "pass" ]; then \
 	  rm -f "$$submission_zip"; \
@@ -177,7 +156,6 @@ run_ta_tools() { \
 	  mv -f "$$submission_zip" "$$failed_dir/" 2>/dev/null || true; \
 	fi; \
 	if [ "$$secondary_status" != "pass" ]; then exit 1; fi; \
-	if [ "$$ta_tools_status" != "pass" ]; then exit 1; fi; \
 	if [ "$$primary_status" != "pass" ]; then exit 1; fi
 
 .PHONY: waves
