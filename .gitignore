@@ -53,3 +53,7 @@ assignments/.testing/Gradescope_Autograder_Template/.git/
 generated_turnins/**
 !generated_turnins/submissions.txt
 !generated_turnins/**/.gitkeep
+
+# Latex Stuff
+*.aux
+*.synctex.gz
