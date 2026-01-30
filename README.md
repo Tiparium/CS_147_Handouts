@@ -13,7 +13,7 @@ Dependencies:
 - [Wavetrace](https://marketplace.visualstudio.com/items?itemName=wavetrace.wavetrace) (search for “wavetrace” in VSCode extensions after VSCode is installed).
 - [Python3](https://www.python.org/downloads/) (recommended).
 
-TA Tools (in Docker image):
+TA Tools (local):
 - LaTeX build tools (latexmk + TeX Live packages) for `./run generate writeup`.
 
 Important Notes:

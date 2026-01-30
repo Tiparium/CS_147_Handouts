@@ -15,7 +15,7 @@ if [ $# -lt 1 ]; then
 fi
 
 if ! command -v latexmk >/dev/null 2>&1; then
-  echo "Error: latexmk not found. Rebuild the Docker image after adding TeX packages." >&2
+  echo "Error: latexmk not found. Install LaTeX locally before running writeup generation." >&2
   exit 1
 fi
 
