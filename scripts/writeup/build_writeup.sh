@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ASSIGNMENTS_ROOT="/repo/assignments"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ASSIGNMENTS_ROOT="$REPO_ROOT/assignments"
 
 usage() {
   echo "Usage: build_writeup.sh <hwXX> [hwYY ...]" >&2
@@ -28,7 +30,7 @@ normalize_hw() {
 
 for raw_hw in "$@"; do
   if [ "$raw_hw" = "rules" ]; then
-    writeup_dir="/repo/assignments/tools/verilog_rules"
+    writeup_dir="$ASSIGNMENTS_ROOT/tools/verilog_rules"
     label="rules"
   else
     hw="$(normalize_hw "$raw_hw")"
