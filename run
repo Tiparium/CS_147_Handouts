@@ -124,7 +124,32 @@ fi
 
 if [ "${1:-}" = "update" ]; then
   shift
-  git -C "$REPO_ROOT" pull || exit $?
+  if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
+    echo "[update] Local changes detected. Please commit or back up your files before running update:" >&2
+    git -C "$REPO_ROOT" status --porcelain >&2
+    exit 1
+  fi
+  # Cleanup: remove generated writeup PDFs before pulling.
+  find "$REPO_ROOT" -type f -path "*/writeup/*.pdf" -print -delete || exit $?
+  rules_pdf="$REPO_ROOT/assignments/tools/verilog_rules/verilog_rules.pdf"
+  [ -f "$rules_pdf" ] && rm -f "$rules_pdf"
+  if ! git -C "$REPO_ROOT" pull; then
+    unmerged=$(git -C "$REPO_ROOT" ls-files -u | awk '{print $4}' | sort -u)
+    if [ -n "$unmerged" ]; then
+      echo "[update] Merge conflicts detected; backing up assignments/ files."
+      while IFS= read -r path; do
+        case "$path" in
+          assignments/*)
+            if [ -f "$REPO_ROOT/$path" ]; then
+              cp -f "$REPO_ROOT/$path" "$REPO_ROOT/$path.bak"
+              echo "  [bak] $path.bak"
+            fi
+            ;;
+        esac
+      done <<<"$unmerged"
+    fi
+    exit 1
+  fi
   "$REPO_ROOT/run" setup "$@"
   exit $?
 fi
