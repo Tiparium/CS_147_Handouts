@@ -81,6 +81,7 @@ print_help() {
   [Setup & Shell]
     ./run setup                  Build the Docker image (uses DOCKER_IMAGE_NAME override if set), then prompt for your name.
     ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
+    ./run update                 Pull latest changes and re-run setup.
     ./run help                   Show this help.
     ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
 
@@ -119,6 +120,13 @@ EOF
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "--help-only" ]; then
   print_help
   exit 0
+fi
+
+if [ "${1:-}" = "update" ]; then
+  shift
+  git -C "$REPO_ROOT" pull || exit $?
+  "$REPO_ROOT/run" setup "$@"
+  exit $?
 fi
 
 if [ "${1:-}" = "verilog_checker" ]; then
