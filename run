@@ -124,10 +124,26 @@ fi
 
 if [ "${1:-}" = "update" ]; then
   shift
-  if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
-    echo "[update] Local changes detected. Please commit or back up your files before running update:" >&2
-    git -C "$REPO_ROOT" status --porcelain >&2
-    exit 1
+  dirty_list="$(git -C "$REPO_ROOT" status --porcelain)"
+  if [ -n "$dirty_list" ]; then
+    affected=()
+    while IFS= read -r line; do
+      path="${line:3}"
+      if [[ "$path" == *" -> "* ]]; then
+        path="${path##* -> }"
+      fi
+      case "$path" in
+        assignments/hw[0-9]*/hw*_*)
+          affected+=("$path")
+          ;;
+      esac
+    done <<< "$dirty_list"
+    if [ ${#affected[@]} -gt 0 ]; then
+      echo "[update] Local assignment changes detected. Please back up your files before running update:" >&2
+      printf '%s\n' "${affected[@]}" >&2
+      exit 1
+    fi
+    echo "[update] Note: local changes outside assignments/ detected, continuing update." >&2
   fi
   # Cleanup: remove generated writeup PDFs before pulling.
   find "$REPO_ROOT" -type f -path "*/writeup/*.pdf" -print -delete || exit $?
