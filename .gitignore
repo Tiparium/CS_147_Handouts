@@ -26,6 +26,8 @@ dump.vcd
 **/*.lst
 **/writeup/*.pdf
 *.temp.*
+*.temp/
+**/*.temp/
 archsim.trace
 archsim.ptrace
 assignments/tools/assembler/*.class
