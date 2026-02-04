@@ -1,0 +1,27 @@
+services:
+  vpn:
+    image: vimagick/openconnect:latest
+    container_name: cs147-vpn-sidecar
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      # Set these in your shell or in a .env file (not committed).
+      - VPN_ENDPOINT=${VPN_ENDPOINT:-vpn.sjsu.edu}
+      - VPN_USER=${VPN_USER:-}
+      - VPN_PASS=${VPN_PASS:-}
+      # Optional: group/realm if required by the VPN.
+      - VPN_GROUP=${VPN_GROUP:-}
+    entrypoint: /bin/sh
+    command: >-
+      -lc "
+      echo \"[vpn] endpoint=$VPN_ENDPOINT user=$VPN_USER group=${VPN_GROUP:-<none>}\" >&2;
+      if [ -z \"$VPN_USER\" ] || [ -z \"$VPN_PASS\" ]; then
+        echo '[vpn] Missing VPN_USER or VPN_PASS'; exit 1; fi;
+      if [ -n \"$VPN_GROUP\" ]; then
+        echo \"$VPN_PASS\" | openconnect --protocol=anyconnect --user=\"$VPN_USER\" --authgroup=\"$VPN_GROUP\" \"$VPN_ENDPOINT\";
+      else
+        echo \"$VPN_PASS\" | openconnect --protocol=anyconnect --user=\"$VPN_USER\" \"$VPN_ENDPOINT\";
+      fi"
+    restart: "no"
