@@ -28,7 +28,7 @@ CONFIG = {
     # Per-subproblem points; add/remove entries per assignment.
     "sub_points": {
         "hw1_1": 10.0,
-        "hw1_2": 10.0,
+        "hw1_2": 20.0,
     },
 }
 
@@ -222,13 +222,7 @@ def main() -> int:
     print(f"Curve note  : {timing_flag}")
     print(f"Curved pct  : {curved_percent:.2f}%")
     print(f"Final score : {final_score:.2f} / {total_pts:.2f}")
-    messages = [
-        "[PLACEHOLDER]:",
-        "If you see this, this assignment has not yet received official points.",
-        "Try running [git pull], followed by [./run setup] to grab any updates and retry.",
-        "If this does not fix the problem, the TA has not yet implemented the grader.",
-    ]
-    print(f"autograder_messages={json.dumps(messages)}")
+    print("autograder_messages=[]")
     print("-----------------------")
     for note in notes:
         print(note)
