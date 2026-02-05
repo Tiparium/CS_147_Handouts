@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ASSIGNMENTS_ROOT="$REPO_ROOT/assignments"
+ASSIGNMENTS_ROOT="/repo/assignments"
 
 usage() {
   echo "Usage: build_writeup.sh <hwXX> [hwYY ...]" >&2
@@ -15,7 +13,7 @@ if [ $# -lt 1 ]; then
 fi
 
 if ! command -v latexmk >/dev/null 2>&1; then
-  echo "Error: latexmk not found. Install LaTeX locally before running writeup generation." >&2
+  echo "Error: latexmk not found. Rebuild the Docker image after adding TeX packages." >&2
   exit 1
 fi
 
@@ -30,7 +28,7 @@ normalize_hw() {
 
 for raw_hw in "$@"; do
   if [ "$raw_hw" = "rules" ]; then
-    writeup_dir="$ASSIGNMENTS_ROOT/tools/verilog_rules"
+    writeup_dir="/repo/assignments/tools/verilog_rules"
     label="rules"
   else
     hw="$(normalize_hw "$raw_hw")"

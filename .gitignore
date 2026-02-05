@@ -24,10 +24,6 @@ dump.vcd
 **/*.img
 *.lst
 **/*.lst
-**/writeup/*.pdf
-*.temp.*
-*.temp/
-**/*.temp/
 archsim.trace
 archsim.ptrace
 assignments/tools/assembler/*.class
@@ -53,11 +49,16 @@ assignments/.testing/waves/*
 .testing_selftest_attempt*.log
 assignments/.testing/Gradescope_Autograder_Template/.git/
 
+# Latex stuff
+*.aux
+*.synctex.gz
+
+# Temporary scratch artifacts
+*.temp.*
+*.temp/
+**/*.temp/
+
 # Generated submissions (keep directory structure and submissions.txt)
 generated_turnins/**
 !generated_turnins/submissions.txt
 !generated_turnins/**/.gitkeep
-
-# Latex Stuff
-*.aux
-*.synctex.gz

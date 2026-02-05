@@ -12,6 +12,11 @@ RUN apt-get update && \
     python3 \
     python3-pip \
     python3-diff-match-patch \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    texlive-latex-base \
+    texlive-latex-extra \
+    latexmk \
     tree \
     vim \
     docker.io \
