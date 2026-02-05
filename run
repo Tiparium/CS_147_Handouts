@@ -223,6 +223,8 @@ print_help() {
     ./run generate writeup [hw]  Rebuild writeup PDFs locally (not intended for students).
     ./run generate writeup rules Rebuild the Verilog rules PDF locally (not intended for students).
     ./run generate vpn           Bring up VPN sidecar and run connectivity check (local-only).
+    ./run vpn up [args]          Start VPN sidecar and leave it running.
+    ./run vpn down               Stop VPN sidecar.
 
   [Student Info]
     ./run student name [value]   View/update the recorded student name.
@@ -245,6 +247,24 @@ EOF
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "--help-only" ]; then
   print_help
   exit 0
+fi
+
+if [ "${1:-}" = "vpn" ]; then
+  shift
+  case "${1:-}" in
+    up)
+      shift || true
+      exec "$REPO_ROOT/run" generate vpn --sso-host --keepopen --no-wait "$@"
+      ;;
+    down)
+      shift || true
+      exec docker compose -f "$REPO_ROOT/docker/vpn_sidecar/docker-compose.yml" down
+      ;;
+    *)
+      echo "Usage: ./run vpn [up|down]" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 if [ "${1:-}" = "verilog_checker" ]; then
@@ -288,12 +308,42 @@ if [ "${1:-}" = "generate" ]; then
       vpn_status="pass"
       vpn_fail_reason=""
       vpn_compose_output=""
-      VPN_GROUP="${VPN_GROUP:-SJSU-VPN}"
+      VPN_GROUP="${VPN_GROUP:-Student-SSO}"
+      VPN_ENDPOINT="${VPN_ENDPOINT:-vpn.sjsu.edu}"
+      VPN_PASS="${VPN_PASS:-}"
       keep_open="false"
-      if [ "${1:-}" = "-keepopen" ]; then
-        keep_open="true"
-        shift || true
-      fi
+      no_wait="false"
+      sso_mode="false"
+      sso_host="false"
+      open_auth_url="true"
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -keepopen)
+            keep_open="true"
+            shift || true
+            ;;
+          --no-wait)
+            no_wait="true"
+            shift || true
+            ;;
+          --sso|-sso)
+            sso_mode="true"
+            shift || true
+            ;;
+          --sso-host)
+            sso_mode="true"
+            sso_host="true"
+            shift || true
+            ;;
+          --no-open)
+            open_auth_url="false"
+            shift || true
+            ;;
+          *)
+            break
+            ;;
+        esac
+      done
       print_vpn_fail() {
         local msg="$1"
         vpn_status="fail"
@@ -331,21 +381,77 @@ if [ "${1:-}" = "generate" ]; then
               set_student_id_host "$VPN_USER"
             fi
           fi
-          if [ -z "${VPN_PASS:-}" ]; then
-            printf "VPN password: "
-            read -r -s VPN_PASS
-            echo
+          if [ "$sso_mode" != "true" ]; then
+            if [ -z "${VPN_PASS:-}" ]; then
+              printf "VPN password: "
+              read -r -s VPN_PASS
+              echo
+            fi
           fi
-          if [ -z "$VPN_USER" ] || [ -z "$VPN_PASS" ]; then
+          if [ -z "$VPN_USER" ] || { [ "$sso_mode" != "true" ] && [ -z "$VPN_PASS" ]; }; then
             print_vpn_fail "VPN credentials not provided."
           fi
         fi
       fi
       if [ "$vpn_status" = "pass" ]; then
+        VPN_COOKIE=""
+        if [ "$sso_mode" = "true" ]; then
+          echo "  [INFO] Starting SSO authentication (Duo)..."
+          auth_log="$(mktemp)"
+          auth_cmd='echo "[vpn] auth endpoint=$VPN_ENDPOINT user=$VPN_USER group=$VPN_GROUP" >&2; \
+openconnect --protocol=anyconnect --user="$VPN_USER" --authgroup="$VPN_GROUP" --useragent="AnyConnect" -vvv --authenticate "$VPN_ENDPOINT"'
+          if [ "$sso_host" = "true" ]; then
+            if ! command -v openconnect >/dev/null 2>&1; then
+              print_vpn_fail "Host openconnect not found (required for --sso-host)."
+            else
+              if openconnect --protocol=anyconnect --user="$VPN_USER" --authgroup="$VPN_GROUP" --useragent="AnyConnect" -vvv --authenticate "$VPN_ENDPOINT" \
+                2>&1 | tee "$auth_log"; then
+                :
+              else
+                print_vpn_fail "SSO authentication failed."
+              fi
+            fi
+          else
+            if docker run --rm $DOCKER_PLATFORM_FLAG -it --entrypoint /bin/sh \
+              -e VPN_ENDPOINT="$VPN_ENDPOINT" \
+              -e VPN_USER="$VPN_USER" \
+              -e VPN_GROUP="$VPN_GROUP" \
+              "$vpn_image" -lc \
+              "$auth_cmd" \
+              2>&1 | tee "$auth_log"; then
+              :
+            else
+              print_vpn_fail "SSO authentication failed."
+            fi
+            auth_url="$(grep -Eo 'Failed to spawn external browser for https?://[^ ]+' "$auth_log" | head -n1 | sed 's/^.*for //' || true)"
+            if [ -z "$auth_url" ]; then
+              auth_url="$(grep -Eo 'https?://[^ ]+' "$auth_log" | head -n1 || true)"
+            fi
+            if [ -n "$auth_url" ]; then
+              echo "  [INFO] SSO login URL: $auth_url"
+              if [ "$open_auth_url" = "true" ]; then
+                if command -v open >/dev/null 2>&1; then
+                  open "$auth_url" >/dev/null 2>&1 || true
+                elif command -v xdg-open >/dev/null 2>&1; then
+                  xdg-open "$auth_url" >/dev/null 2>&1 || true
+                fi
+              fi
+            fi
+          fi
+          VPN_COOKIE="$(grep -Eo 'COOKIE=.*' "$auth_log" | head -n1 | sed -E 's/^COOKIE=//; s/^'\''//; s/'\''$//' || true)"
+          if [ -z "$VPN_COOKIE" ]; then
+            print_vpn_fail "SSO cookie not captured."
+          fi
+          rm -f "$auth_log"
+        fi
+        if [ "$vpn_status" != "pass" ]; then
+          echo "  [Result: $(printf '%s' "$vpn_status" | tr '[:lower:]' '[:upper:]')]"
+          exit 1
+        fi
         echo "  [INFO] Starting VPN sidecar (local-only)"
-        echo "  [INFO] VPN params: endpoint=vpn.sjsu.edu user=${VPN_USER} group=${VPN_GROUP:-<none>} pass=<redacted>"
+        echo "  [INFO] VPN params: endpoint=${VPN_ENDPOINT} user=${VPN_USER} group=${VPN_GROUP:-<none>} pass=<redacted>"
         vpn_compose_output="$(
-          VPN_ENDPOINT="vpn.sjsu.edu" VPN_USER="$VPN_USER" VPN_PASS="$VPN_PASS" VPN_GROUP="${VPN_GROUP:-}" \
+          VPN_ENDPOINT="$VPN_ENDPOINT" VPN_USER="$VPN_USER" VPN_PASS="$VPN_PASS" VPN_GROUP="${VPN_GROUP:-}" VPN_COOKIE="${VPN_COOKIE:-}" \
             docker compose -f "$vpn_compose" up -d --remove-orphans 2>&1
         )" || true
         if [ -n "$vpn_compose_output" ] && ! docker compose -f "$vpn_compose" ps >/dev/null 2>&1; then
@@ -382,11 +488,19 @@ if [ "${1:-}" = "generate" ]; then
             docker logs --tail=200 cs147-vpn-sidecar 2>/dev/null | sed 's/^/    /' || true
           fi
           if [ "$keep_open" = "true" ]; then
-            echo "  [INFO] VPN sidecar is running. Press Enter to stop."
-            trap 'docker compose -f "$vpn_compose" down >/dev/null 2>&1 || true; exit 0' INT
-            read -r _
+            if [ "$no_wait" = "true" ]; then
+              echo "  [INFO] VPN sidecar is running."
+              echo "  [INFO] Use './run vpn down' to stop it."
+            else
+              echo "  [INFO] VPN sidecar is running. Press Enter to stop."
+              trap 'docker compose -f "$vpn_compose" down >/dev/null 2>&1 || true; exit 0' INT
+              read -r _
+              docker compose -f "$vpn_compose" down >/dev/null 2>&1 || true
+            fi
           fi
-          docker compose -f "$vpn_compose" down >/dev/null 2>&1 || true
+          if [ "$keep_open" != "true" ]; then
+            docker compose -f "$vpn_compose" down >/dev/null 2>&1 || true
+          fi
         fi
       fi
       echo "  [Result: $(printf '%s' "$vpn_status" | tr '[:lower:]' '[:upper:]')]"
@@ -702,7 +816,7 @@ if [ "${1:-}" = "setup" ]; then
     done
   fi
   ensure_config_writable "$CONFIG_FILE_HOST"
-  set_student_name_host "$preset_name"
+set_student_name_host "$preset_name"
   while [ $# -gt 0 ]; do
     case "$1" in
       --test-force=*)
@@ -715,6 +829,108 @@ if [ "${1:-}" = "setup" ]; then
     esac
     shift
   done
+  ensure_openconnect_host() {
+    local os
+    local update_available="false"
+    local install_needed="false"
+    local update_needed="false"
+    local update_choice=""
+    local deps_list=()
+    os="$(uname -s 2>/dev/null || true)"
+    if [ "$os" = "Darwin" ]; then
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "[setup] openconnect: Homebrew not found; skipping host install." >&2
+        return 0
+      fi
+      if ! brew list openconnect >/dev/null 2>&1; then
+        install_needed="true"
+      else
+        if brew outdated --quiet openconnect 2>/dev/null | grep -q '^openconnect$'; then
+          update_available="true"
+        fi
+      fi
+      if [ "$update_available" = "true" ]; then
+        printf "[setup] openconnect update available. Update? [y/N] (15s timeout): "
+        if read -r -t 15 update_choice; then
+          case "$update_choice" in
+            y|Y|yes|YES) update_needed="true" ;;
+            *) ;;
+          esac
+        fi
+      fi
+      if [ "$install_needed" = "true" ]; then
+        deps_list+=("openconnect (install)")
+      elif [ "$update_needed" = "true" ]; then
+        deps_list+=("openconnect (update)")
+      fi
+      if [ ${#deps_list[@]} -gt 0 ]; then
+        echo "[setup] Host dependencies will be installed/updated:"
+        printf "  - %s\n" "${deps_list[@]}"
+        echo "[setup] Installing/updating via Homebrew..."
+        brew update >/dev/null 2>&1 || true
+        if [ "$install_needed" = "true" ]; then
+          brew install openconnect
+        elif [ "$update_needed" = "true" ]; then
+          brew upgrade openconnect || true
+        fi
+      else
+        echo "[setup] Host dependencies are up to date."
+      fi
+      return 0
+    fi
+    if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/version 2>/dev/null; then
+      if ! dpkg -s openconnect >/dev/null 2>&1; then
+        install_needed="true"
+      else
+        if apt-cache policy openconnect 2>/dev/null | awk '
+          $1 == "Installed:" {installed=$2}
+          $1 == "Candidate:" {candidate=$2}
+          END {exit (installed != "" && candidate != "" && installed != candidate) ? 0 : 1}
+        '; then
+          update_available="true"
+        fi
+      fi
+      if [ "$update_available" = "true" ]; then
+        printf "[setup] openconnect update available. Update? [y/N] (15s timeout): "
+        if read -r -t 15 update_choice; then
+          case "$update_choice" in
+            y|Y|yes|YES) update_needed="true" ;;
+            *) ;;
+          esac
+        fi
+      fi
+      if [ "$install_needed" = "true" ]; then
+        deps_list+=("openconnect (install)")
+      elif [ "$update_needed" = "true" ]; then
+        deps_list+=("openconnect (update)")
+      fi
+      if [ ${#deps_list[@]} -gt 0 ]; then
+        echo "[setup] Host dependencies will be installed/updated:"
+        printf "  - %s\n" "${deps_list[@]}"
+        echo "[setup] Passwords are not saved."
+        if command -v sudo >/dev/null 2>&1; then
+          sudo -v
+          sudo apt-get update
+          if [ "$install_needed" = "true" ]; then
+            sudo apt-get install -y openconnect
+          elif [ "$update_needed" = "true" ]; then
+            sudo apt-get install -y openconnect
+          fi
+        else
+          echo "[setup] openconnect: sudo not found; skipping host install." >&2
+        fi
+      else
+        echo "[setup] Host dependencies are up to date."
+      fi
+      return 0
+    fi
+    echo "============================================================" >&2
+    echo "[setup] WARNING: unsupported host platform." >&2
+    echo "[setup] Some dependencies were not installed." >&2
+    echo "[setup] The environment may not be fully set up." >&2
+    echo "============================================================" >&2
+  }
+  ensure_openconnect_host
   if [ -f "$REPO_ROOT/assignments/tools/assembler/assemble.sh" ]; then
     chmod +x "$REPO_ROOT/assignments/tools/assembler/assemble.sh"
   fi
