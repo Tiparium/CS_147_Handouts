@@ -1,0 +1,13 @@
+ASSIGNMENT_NAME := project
+CUSTOM_SUBMIT := 1
+include ../assignment-common.mk
+
+.PHONY: submit
+submit:
+	@ASSIGNMENTS_ROOT="$(ASSIGNMENTS_ROOT)" \
+	ASSIGNMENT_DIR="$(ASSIGNMENT_DIR)" \
+	TURNINS_ROOT="$(TURNINS_ROOT)" \
+	STUDENT_NAME="$(STUDENT_NAME)" \
+	PROJECT_PHASE="$(PROJECT_PHASE)" \
+	JUSTGRADE="$(JUSTGRADE)" \
+	bash ./submit_project.sh

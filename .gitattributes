@@ -1,0 +1,13 @@
+# Default text normalization.
+* text=auto
+
+# Shell/runner scripts must keep LF line endings for shebang compatibility.
+run text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Other executable script types used in tooling.
+*.py text eol=lf
+*.pl text eol=lf
+*.tcl text eol=lf

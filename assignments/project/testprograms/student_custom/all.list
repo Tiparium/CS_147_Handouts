@@ -1,0 +1,5 @@
+# Add one test filename per line, including the .asm extension.
+# Lines prepended with '#' will be ignored.
+# example1.asm
+# example2.asm
+# example3.asm

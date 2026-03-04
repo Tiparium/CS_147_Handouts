@@ -1,0 +1,165 @@
+\documentclass[12pt]{article}
+\usepackage{fullpage}
+%\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{listings,amssymb}
+\usepackage{listings}
+\usepackage{graphicx,xcolor}
+%\doublespacing
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\lstset{numbers=left, numberstyle=\tiny}
+\title{CS 147: Lab 02 \\ Due Date: Feb. 24, 2026}
+\author{}
+\date{Feb. 10, 2026}
+\begin{document}
+\maketitle
+%\vspace{-0.5in}
+The main objective of this problem set is to become familiar with using the toolchain for the course project.  
+Feel free to refer
+to the Verilog cheatsheet, Verilog lecture slides linked off of canvas. 
+
+Some advice: Before starting to write any Verilog, you should do the following:
+\begin{enumerate}
+\item
+Break down your design into sub-modules.
+\item Define interfaces between these modules.
+\item Draw paper and pencil schematics for these modules (these will be handed in as scanned
+\texttt{schematic.pdf} file(s)).
+\item Then start writing Verilog.
+\end{enumerate}
+
+\section*{Problem 1 (20 points)}
+Design a 16-bit barrel shifter in Verilog with the following interface. If you need additional information on
+barrel shifter design, you can consult the ALU lecture notes. Note that we call this shifter a barrel shifter
+because it is capable of shifting and rotating bits all the way around in any direction (like a barrel). You
+should \textbf{not} just write a case statement with each constant shift amount – instead think about how the
+hardware would be designed for a shifter, and what underlying modules (e.g., muxes) you might be able to
+utilize to do shifting. 
+
+\textbf{Inputs:}
+\begin{itemize}
+\item $[15:0]$ \texttt{InBS} - 16-bit input operand value to be shifted
+\item $[3:0]$ \texttt{ShAmt} - 4-bit amount to shift (number of bit positions to shift)
+\item $[1:0]$ \texttt{ShiftOper} - shift type, see encoding in table below
+\end{itemize}
+\textbf{Output:}
+\begin{itemize}
+\item $[15:0]$ \texttt{OutBS} - 16-bit output operand
+\end{itemize}
+\begin{center}
+\begin{tabular}{|c|c|} \hline 
+Opcode & Operation \\ \hline
+00 & Rotate left \\ \hline
+01 & Shift left \\ \hline
+10 & Shift right arithmetic \\ \hline
+11 & Shift right logical \\ \hline
+\end{tabular}
+\end{center}
+\textit{(Aside: you should think about if the above 4 opcodes are sufficient to represent all of the shift operations
+you need to implement for your project.)}
+
+Verify the design using the testbenches provided by us.  You are also encouraged to write additional tests, as we may use
+more tests when grading your assignment.  See class slides from the Verilog lecture on how to write tests.
+
+\section*{Problem 2 [30 points]}
+
+This problem should also be done in Verilog. Design a simple 16-bit ALU. Operations to be performed are
+2's Complement ADD, bitwise-OR, bitwise-XOR, bitwise-AND, and the barrel shifter unit from Problem
+1. Additionally, it must have the ability to invert either of its data inputs before performing the operation
+and have a \texttt{Cin} input (to enable subtraction). Another input line also determines whether the arithmetic to
+be performed is signed or unsigned. Use your \texttt{CLA} (from homework 1) in your design, extended as needed
+to take things like overflow and sign into account. For all the shift and rotate operations, assume the number
+to shift is input \texttt{InA} to your ALU and the shift/rotate amount is bits [3:0] of input \texttt{InB} (\textbf{Note:} \texttt{InA/InB} may
+be inverted before reaching the shifter, see below – if either/both is inverted, you should shift/rotate the
+inverted values instead).
+
+\begin{center}
+\begin{tabular}{|c|c|c|} \hline 
+Opcode & Function & Result \\ \hline
+000 & rll & Rotate left \\ \hline
+001 & sl & Shift left logical \\ \hline
+010 & sra & Shift right arithmetic \\ \hline
+011 & srl & Shift right logical \\ \hline
+100 & ADD & A+B \\ \hline
+101 & AND & A \& B \\ \hline
+110 & OR & A $|$ B \\ \hline
+111 & XOR & A \^{} B \\ \hline
+\end{tabular}
+\end{center}
+
+The external interface of the ALU should be:
+
+\textbf{Inputs}
+\begin{itemize}
+\item \texttt{InA}[15:0], \texttt{InB}[15:0] - Data input lines \texttt{InA} and \texttt{InB} (16 bits each).
+\item \texttt{Cin} - A carry-in for the LSB of the adder.
+\item \texttt{Oper}(2:0) – A 3-bit opcode that determines which operation should be performed and outputted.
+The opcodes are shown in the table above.
+\item \texttt{invA} - An invert-A input that causes the A input to be inverted before the operation is performed.
+\texttt{invA} is active high, which means it inverts A when \texttt{invA} is 1.
+\item \texttt{invB} - An invert-B input (also active high) that causes the \texttt{invB} input to be inverted before the
+operation is performed.
+\item \texttt{sign} – A flag to indicate whether signed-or-unsigned arithmetic should be performed in the ADD
+function on the data lines (this also affects the \texttt{Ofl} output). The sign input is active high for signed
+arithmetic and active low for unsigned arithmetic.
+\end{itemize}
+
+\textbf{Outputs}
+\begin{itemize}
+\item \texttt{Out}(15:0) – Output data from your ALU (16 bits).
+\item \texttt{Ofl} - This should be high (1) if an overflow occurred (1 bit).
+\item \texttt{Zero} - This should be high if the result is exactly zero (1 bit).
+\end{itemize}
+
+Other assumptions:
+\begin{itemize}
+\item You can assume 2's complement numbers.
+\item In case of logic functions, Ofl is not asserted (i.e., kept logic low).
+\end{itemize}
+
+The top-level module definitions and a testbench are included in the download.  
+\textbf{You must not change these top-level module names.}
+
+Simulate and verify your design using the supplied testbench or create one yourself to test any of your
+submodules. You must reuse the barrel shifter unit designed in Problem 1. \textbf{If/when you use files from
+hw2\_1 in Problem 2, you must copy the files over from Problem 1 – you should not assume they are
+in hw2\_2’s folder by default.}
+
+In addition to the Verilog, you should also turn in schematics for each of your components. The schematics
+may be handwritten or computer generated but must be legible if they are handwritten. The schematic files
+should be named \textbf{schematic.pdf} and placed in the corresponding problems subdirectory (e.g.,
+hw2\_1/schematic.pdf and hw2\_2/schematic.pdf). Although the schematics may seem simple for some of
+these components, as your project gets bigger and bigger, you’ll find that drawing schematics of each
+component and the bigger picture will make your task significantly easier.
+
+\section*{Testing Instructions}
+
+To run the testbench programs that we have distributed for this lab, use:
+\begin{itemize}
+\item \texttt{./run test <homework> [problem]}
+\item Replace \texttt{<homework>} with the assignment name (e.g., \texttt{hw1}).
+\item The \texttt{[problem]} argument is optional. If omitted, all tests for the selected homework assignment will be run.
+\item For more detailed output, add \texttt{-v} (e.g., \texttt{./run test -v hw2 hw2\_1}).
+\begin{itemize}
+\item \textbf{Warning:} \texttt{-v} output can be extremely long in some contexts.
+\end{itemize}
+\end{itemize}
+
+\section*{Verilog Rules}
+Read the Verilog rules document at \texttt{assignments/tools/verilog\_rules/verilog\_rules.pdf} and adhere to the conventions.
+Rules adherence will be checked when you run \texttt{./run test}.
+
+\section*{Submission Instructions}
+
+To build a submission for grading, run:
+\begin{itemize}
+\item \texttt{./run build\_submission <assignment>}
+\item This will automatically run \texttt{./run test <assignment>}, then run the generated submission
+through the integrated autograder.
+\item A submission ZIP is created in \texttt{generated\_turnins/<assignment>/}.
+\item If you run \texttt{build\_submission} multiple times for the same assignment, the generated zip files will be prepended with a number. The most recent submission should be the item with the highest number.
+\item \textbf{IMPORTANT:} Running \texttt{./run build\_submission <assignment>} \textbf{DOES NOT} actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
+\end{itemize}
+
+\end{document}

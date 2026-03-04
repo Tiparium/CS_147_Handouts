@@ -1,0 +1,109 @@
+# macOS cruft
+.DS_Store
+
+# Local docker image exports (e.g., from `docker save`)
+cs147-verilog-toolchain.tar
+cs147-verilog-toolchain.img
+cs552.tar
+cs552.tar.gz
+*.sjsu.edu
+*.bak
+
+# Global log ignores (keep directories, ignore log files)
+*.log
+**/*.log
+*.out
+**/*.out
+*.aux
+**/*.aux
+*.fdb_latexmk
+**/*.fdb_latexmk
+*.fls
+**/*.fls
+*.toc
+**/*.toc
+dump.vcd
+**/dump.vcd
+*.img
+**/*.img
+*.img.dmem
+**/*.img.dmem
+*.img.reg
+**/*.img.reg
+*.dmem
+**/*.dmem
+*.reg
+**/*.reg
+*.lst
+**/*.lst
+archsim.trace
+archsim.ptrace
+assignments/tools/assembler/*.class
+submission_report.log
+**/.last_submit_zip
+
+# Local student config
+config.json
+student_profile.env
+
+# Local, untracked context files
+.context/
+
+# Hidden testing errors
+assignments/.testing/errors/*
+assignments/.testing/Gradescope_Autograder_Template/failed tests/*
+assignments/hw*/Gradescope_Autograder_Template/failed tests/*
+assignments/.testing/Gradescope_Autograder_Template/local_results/*
+assignments/.testing/selftest_logs/*
+assignments/.testing/selftest_logs/selftest_logs.zip
+assignments/.testing/waves/*
+
+# Local self-test logs
+.testing_selftest_attempt*.log
+assignments/.testing/Gradescope_Autograder_Template/.git/
+
+# Latex stuff
+*.aux
+*.synctex.gz
+
+# Temporary scratch artifacts
+*.temp.*
+*.temp/
+**/*.temp/
+list.txt
+**/list.txt
+
+# Generated submissions (keep directory structure and submissions.txt)
+generated_turnins/**
+!generated_turnins/
+!generated_turnins/submissions.txt
+
+# Project test outputs
+assignments/project/.wsrun_out/
+
+# Local synthesis pull outputs
+assignments/hw*/hw*/synth_*
+assignments/hw*/hw*/synth_*.old
+assignments/hw*/hw*/.synth_pull_tmp_*
+
+# Local HW4 random opcode target assignment
+assignments/hw04/hw4_1/targets.txt
+
+# Student custom project tests and assembled artifacts
+assignments/project/testprograms/student_custom/*
+!assignments/project/testprograms/student_custom/.gitkeep
+!assignments/project/testprograms/student_custom/README.txt
+!assignments/project/testprograms/student_custom/all.list
+
+# Local retained legacy project tests (must not ship)
+assignments/project/testprograms/david_orig/
+
+# Python bytecode caches
+__pycache__/
+**/__pycache__/
+
+# Local grader run artifacts
+assignments/*/Gradescope_Autograder_Template/test_submissions/*.zip
+
+# Local autograder draft bundles
+assignments/*/Gradescope_Autograder_Template/drafts/*

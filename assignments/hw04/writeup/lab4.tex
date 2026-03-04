@@ -1,0 +1,197 @@
+\documentclass[12pt]{article}
+\usepackage{fullpage}
+%\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{listings,amssymb}
+\usepackage{listings}
+\usepackage{graphicx,xcolor}
+%\doublespacing
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\lstset{numbers=left, numberstyle=\tiny}
+\title{CS 147: Lab 04 \\ Due Date: March 24, 2026}
+\author{}
+\date{March 10, 2026}
+\begin{document}
+\maketitle
+%\vspace{-0.5in}
+
+This homework assignment requires writing assembly tests for your project. We will be releasing these
+tests to help everyone debug their processors, so I strongly recommend you add comments to make
+it easy for your fellow classmates to understand what your tests do. Here are some links to important
+documents/webpages you will need to properly complete this assignment:
+
+\begin{enumerate}
+\item
+Info about how to write assembly code and also about how to use the assembler can be found in
+the Using the assembler page.
+\item Details about what each instruction means is available in the ISA specification.
+\item The WISC-SJ26 Simulator-Debugger page has information on the simulator for the WISC-SJ26
+ISA.
+\item Other useful documents on how to write tests:
+\begin{enumerate}
+\item Other example test programs to understand syntax etc.
+\item Test Programs FAQ
+\end{enumerate}
+
+\end{enumerate}
+
+The work flow we will follow is:
+\begin{enumerate}
+\item Write test in WISC-SJ26 assembly language.
+\item Assemble using:
+\textit{(This is one command broken into multiple lines.)}
+\begin{verbatim}
+./run assemble assignments/hw04/<subproblem>/<test_name>.asm \
+  assignments/hw04/<subproblem>/<test_name>
+\end{verbatim}
+\item Simulate the test in the simulator and make sure your test is doing what you thought it was doing.
+Use the simulator via:
+\begin{verbatim}
+./run simulate assignments/hw04/<subproblem>/<test_name>_all.img
+\end{verbatim}
+\item Run the integrated testbench checks for both subproblems:
+\begin{verbatim}
+./run test hw4 hw4_1
+./run test hw4 hw4_2
+\end{verbatim}
+\item Write up your explanation of each test.
+\end{enumerate}
+
+Here is a short demo:
+\begin{verbatim}
+prompt% ./run assemble assignments/hw04/hw4_1/add_0.asm assignments/hw04/hw4_1/add_0
+Created the following files
+add_0_0.img add_0_1.img add_0_2.img add_0_3.img
+add_0_all.img add_0.lst
+
+prompt% ./run simulate assignments/hw04/hw4_1/add_0_all.img
+
+WISCalculator v1.0
+Author Derek Hower (drh5@cs.wisc.edu)
+Type "help" for more information
+Loading program...
+Executing...
+lbi r1, -1
+INUM: 0 PC: 0x0000 REG: 1 VALUE: 0xffff
+lbi r2, -1
+INUM: 1 PC: 0x0002 REG: 2 VALUE: 0xffff
+add r3, r1, r2
+INUM: 2 PC: 0x0004 REG: 3 VALUE: 0xfffe
+halt
+program halted
+INUM: 3 PC: 0x0006
+Program Finished
+
+prompt%
+
+\end{verbatim}
+
+The simulator will print a trace of each instruction along with the state of the relevant registers. You should
+examine these to make sure that your test is indeed doing what is expected.
+
+Suggestions:
+\begin{itemize}
+\item Identify corner cases. Think about possible bugs in the hardware with pipelining.
+\item Ideally tests should be short and target specific cases, NOT all cases at once.
+\item Write comments in your assembly code explain that what the test is doing (comments use "//" for
+our assembler)
+\item Make sure that all of your assembly files will assemble. You won't get credit for malformed
+assembly.
+\item The goal of this problem is to make sure you understand the ISA and develop targeted tests for the
+(pipelined) hardware. Understanding the ISA is required (and extremely helpful!) before building
+(pipelined) hardware for it!
+\end{itemize}
+
+\section*{Problem 1 (20 points)}
+\begin{enumerate}
+\item (10 points)
+Generate your assigned Problem 1 target opcodes:
+\begin{verbatim}
+./run generate hw4
+\end{verbatim}
+This creates:
+\begin{verbatim}
+assignments/hw04/hw4_1/targets.txt
+\end{verbatim}
+Target letters map to opcodes as follows:
+\begin{center}
+\begin{tabular}{|c|c|}  \hline
+Letter & Instruction \\ \hline
+A & ROLI \\ \hline
+B & SLLI \\ \hline
+C & RORI \\ \hline
+D & SRLI \\ \hline
+E & ST \\ \hline
+F & LD \\ \hline
+G & STU \\ \hline
+H & BTR \\ \hline
+I & ROL \\ \hline
+J & SRL \\ \hline
+K & ROR \\ \hline
+L & SLL \\ \hline
+M & SEQ \\ \hline
+N & SLT \\ \hline
+O & SLE \\ \hline
+Q & SCO \\ \hline
+R & SIIC, RTI \\ \hline
+S & SLBI \\ \hline
+T & JR \\ \hline
+U & JAL \\ \hline
+V & JALR \\ \hline
+W & XOR, XORI \\ \hline
+X & ANDN, ANDNI \\ \hline
+\end{tabular}
+\end{center}
+
+Write three unique tests (\texttt{p1-1.asm}, \texttt{p1-2.asm}, \texttt{p1-3.asm}) using the assigned targets in order. In addition to using each assigned instruction, your tests should exercise different parts of the pipeline (for example, forwarding paths, stalls, or corner cases such as sign extension).
+
+It is fine if your tests contain other instructions (e.g., LBI to initialize registers, HALT to stop the program,
+and NOPs to test various pipeline stalls, forwarding cases, or branch cases), but each of your tests must
+include its assigned target instruction.
+
+\item (10 points)
+Write an explanation of your programs including where and why forwarding takes place.
+Write your answer in \texttt{hw4\_1/p1\_answers.txt} under:
+\begin{verbatim}
+HW4_1_2 Answer:
+// Your answer here
+\end{verbatim}
+\textit{(Explain all three programs in the same answer block.)}
+\end{enumerate}
+
+\section*{Problem 2 (20 points)}
+\begin{enumerate}
+\item (10 points) Write two unique assembly programs to demonstrate why branch prediction is necessary and
+useful. Write your code in \texttt{p2-1.asm} and \texttt{p2-2.asm}, respectively.
+\item (5 points) Write an explanation of your programs and how branch prediction helps in \texttt{hw4\_2/p2\_answers.txt} under:
+\begin{verbatim}
+HW4_2_2 Answer:
+// Your answer here
+\end{verbatim}
+\item (5 points) Will branch prediction always take only 1 cycle in your 5-stage processor? Write your answer
+in \texttt{hw4\_2/p2\_answers.txt} under:
+\begin{verbatim}
+HW4_2_3 Answer:
+// Your answer here
+\end{verbatim}
+\end{enumerate}
+
+\section*{Submission Instructions}
+
+To build a submission for grading, run:
+\begin{itemize}
+\item \texttt{./run build\_submission <assignment>}
+\item This will automatically run \texttt{./run test <assignment>}, then run the generated submission
+through the integrated autograder.
+\item A submission ZIP is created in \texttt{generated\_turnins/<assignment>/}.
+\item If you run \texttt{build\_submission} multiple times for the same assignment, the generated zip files will be prepended with a number. The most recent submission should be the item with the highest number.
+\item \textbf{IMPORTANT:} Running \texttt{./run build\_submission <assignment>} \textbf{DOES NOT} actively submit your assignment, it only generates the file you will submit. This file must be manually uploaded to Gradescope.
+\end{itemize}
+
+If an assembly file is missing or does not compile, you will automatically get zero points for that part.
+
+Note: no schematics are needed for this assignment.
+
+
+\end{document}

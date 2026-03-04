@@ -1,0 +1,133 @@
+# ###########################################################
+#
+# .synopsys_dc.setup 
+#
+# VTVT LAB (VIRGINIA TECH VLSI FOR TELECOMMUNICATIONS)
+# Jeannette Djigbenou (JDDJIG01@VT.EDU)
+# Date Created: November 12, 2006
+# 
+#  This file is used for dc_shell initialization. 
+#  Version Y-2006.06-SP2 for linux -- Sep 01, 2006
+#
+#  To get the EDIF 200 format of a design, run dc_shell in the
+#  dcsh mode by starting dc_shell as follow: 
+#	> dc_shell -db_mode -dcsh_mode
+#  It is advised to run dc_shell in the XG format
+#  as the dcsh mode will not be available in future releases.
+#
+# ###########################################################
+#	BEFORE USING FILE: Update the search path by adding the path
+#		to your Synopsys Installation directory.
+#
+
+
+
+# Standard Information
+set company "Virginia Tech VLSI for Telecommunications"
+set designer  "Jeannette Donan Djigbenou(jddjig01@vt.edu)"
+
+# Library and Search Path variables
+# set search_path {. ./libs  /s/synopsys-2008_08_20/@sys/libraries/syn /scratch/users/karu/courses/cs755/tools/Synopsys_Libraries/libs}
+# set search_path {. ./libs  /s/synopsys-2008_08_20/@sys/libraries/syn /u/k/a/karu/courses/cs552/cad/Synopsys_Libraries/libs}
+
+set search_path {. ./libs /apps/cadence/gpdk/FreePDK45/osu_soc/lib/files}
+
+#Set the 45 nm target and link library
+set link_library {"gscl45nm.db"}
+set target_library {"gscl45nm.db"}
+# set alib_library_analysis_path { /u/k/a/karu/courses/cs552/cad/Synopsys_Libraries/osu_freepdk_1.0/lib/files }
+set alib_library_analysis_path { /apps/cadence/gpdk/FreePDK45/osu_soc/lib/files }
+
+set symbol_library { "basic.sdb" "NCSU_Analog_Parts.sdb" "US.8ths.sdb"}
+
+# Verilog 
+set verilogout_no_tri "true"
+
+# Read Symbol
+set edifin_lib_route_grid 1024
+set vhdlout_use_packages {IEEE.std_logic_1164 IEEE.std_logic_arith IEEE.std_logic_textio vtvt_tsmc180.components}
+
+
+# EDIF read symbol library variables
+# EDIF variables for Importing Special Connectors for Composer
+      set edifin_lib_in_port_symbol "ipin"
+      set edifin_lib_out_port_symbol "opin"
+      set edifin_lib_inout_port_symbol "iopin"
+
+      set edifin_lib_in_osc_symbol "iosc"
+      set edifin_lib_out_osc_symbol "oosc"
+      set edifin_lib_inout_osc_symbol "oosc"
+
+      set edifin_lib_logic_1_symbol "vdd"
+      set edifin_lib_logic_0_symbol "vss"
+
+# EDIF variables for Importing a Bus Ripper from Composer
+      set edifin_lib_ripper_bits_property "schPatchExpr"
+      set edifin_lib_ripper_bus_end "bus_end"
+      set edifin_lib_ripper_cell_end "ripper"
+      set edifin_lib_ripper_view_name "symbol"
+      set edifin_lib_route_grid 1024
+
+# EDIF variables for Importing Sheet Templates from Composer
+      set edifin_lib_templates {{A,landscape,Asize},{A,portrait,Asize.book}, \
+      {B,landscape,Bsize},{C,landscape,Csize},{D,landscape,Dsize}, \
+      {E,landscape,Esize},{F,landscape,Fsize}}
+
+      # Bus Naming variables
+      set bus_naming_style "%s<%d>"
+      set bus_dimension_separator_style "><"
+      set bus_range_separator_style ":" 
+      set bus_extraction_style "%s<%d:%d>"
+      set bus_minus_style "-%d"
+      set edifout_no_array "false"
+
+      # Read design variagles
+      set edifin_autoconnect_offPageConnectors "true"
+      set edifin_delete_empty_cells "true"
+      set edifin_delete_ripper_cells "true"
+
+      # Power and Ground variables
+      set edifin_ground_net_name "vss!"
+      set edifin_ground_net_property_name ""
+      set edifin_ground_net_property_value   ""
+
+      set edifout_ground_name   "vss!"
+      set edifout_ground_net_name   "vss!"
+      set edifout_ground_net_property_name   ""
+      set edifout_ground_net_property_value   ""
+      set edifout_ground_pin_name   "vss!"
+
+      set edifin_power_net_name   "vdd!"
+      set edifin_power_net_property_name   ""
+      set edifin_power_net_property_value   ""
+
+      set edifout_power_name   "vdd"
+      set edifout_power_net_name   "vdd!"
+      set edifout_power_net_property_name   ""
+      set edifout_power_net_property_value   ""
+      set edifout_power_pin_name   "vdd!"
+      set edifout_power_and_ground_representation   "net"
+
+
+      # Net to Port Connection variables
+      set edifin_autoconnect_ports   "true"
+      set compile_fix_multiple_port_nets   "true"
+      set gen_match_ripper_wire_widths   "true"
+      set edifout_name_rippers_same_as_wires   "false"
+      set link_force_case   "case_insensitive"
+      set single_group_per_sheet   "true"
+      set use_port_name_for_oscs   "false"
+      set write_name_nets_same_as_ports   "true"
+
+      # Output variables
+      set edifout_netlist_only   "false"
+      set edifout_external   "true"
+      set edifout_translate_origin   "center"
+      set edifout_display_instance_names   "false"
+      set edifout_display_net_name   "false"
+      set edifout_target_system   "cadence"
+      set edifout_instantiate_ports   "true"
+      set edifout_pin_name_property_name   "pinName"
+      set edifout_designs_library_name   "SYNOPSYS"
+
+      

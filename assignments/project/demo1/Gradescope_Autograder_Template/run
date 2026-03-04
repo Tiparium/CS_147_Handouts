@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Helper to mirror Gradescope locally.
+# Commands:
+#   ./run setup              -> build local image from docker/Dockerfile
+#   ./run grade <submission> -> run autograder against a submission dir (default: first in test_submissions)
+
+IMAGE_TAG="${IMAGE_TAG:-gradescope/autograder-base}"
+RESULTS_DIR="${RESULTS_DIR:-local_results}"
+SUBMISSIONS_ROOT="${SUBMISSIONS_ROOT:-test_submissions}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPINNER_SH="$SCRIPT_DIR/../../../../scripts/spinner.sh"
+source "$SPINNER_SH"
+cleanup_dir=""
+progress_pid=""
+VERBOSE="${VERBOSE:-${AG_VERBOSE:-0}}"
+HASH_VERBOSE="${AG_HASH_VERBOSE:-0}"
+DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./run setup [--rebuild]
+  ./run grade <submission_dir|submission.zip>
+    - If <submission> is omitted, uses the first directory or zip under test_submissions/.
+Env overrides:
+  IMAGE_TAG, DOCKERFILE, RESULTS_DIR, SUBMISSIONS_ROOT
+EOF
+}
+
+require_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "docker is required but not found in PATH" >&2
+    exit 1
+  fi
+}
+
+require_unzip() {
+  if ! command -v unzip >/dev/null 2>&1; then
+    echo "unzip is required to grade a .zip submission but is not in PATH" >&2
+    exit 1
+  fi
+}
+
+pick_submission() {
+  local chosen="$1"
+  if [ -n "$chosen" ]; then
+    echo "$chosen"
+    return
+  fi
+  chosen=$(find "$SUBMISSIONS_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o \( -type f -name "*.zip" \) \) | head -n 1 2>/dev/null || true)
+  echo "$chosen"
+}
+
+prepare_submission() {
+  local path="$1"
+  if [ -d "$path" ]; then
+    echo "$path"
+    return
+  fi
+
+  if [ -f "$path" ] && [[ "$path" == *.zip ]]; then
+    require_unzip
+    cleanup_dir="$(mktemp -d -t autograder_submission.XXXXXX)"
+    if [ "$VERBOSE" -eq 1 ]; then
+      echo "Unzipping submission '$path' -> $cleanup_dir" >&2
+    fi
+    unzip -q "$path" -d "$cleanup_dir"
+    echo "$cleanup_dir"
+    return
+  fi
+
+  echo "Submission not found or unsupported format: $path" >&2
+  exit 1
+}
+
+cleanup() {
+  if [ -n "$cleanup_dir" ] && [ -d "$cleanup_dir" ]; then
+    rm -rf "$cleanup_dir"
+  fi
+  if [ -n "$progress_pid" ]; then
+    kill "$progress_pid" 2>/dev/null || true
+  fi
+}
+
+progress() {
+  local pid="$1"
+  local start_ts="$2"
+  spinner_wait "$pid" "Autograder" "$start_ts"
+}
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+  setup)
+    require_docker
+    if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+      echo "Image '$IMAGE_TAG' already exists; reusing."
+      exit 0
+    fi
+    echo "Pulling base image '$IMAGE_TAG' ..."
+    docker pull "$IMAGE_TAG"
+    echo "Done."
+    ;;
+
+  grade)
+    require_docker
+    trap cleanup EXIT
+    submission_arg="${1:-}"
+    submission=$(pick_submission "$submission_arg")
+    if [ -z "$submission" ]; then
+      echo "Submission not found. Provide one: ./run grade test_submissions/<case_or_zip>" >&2
+      exit 1
+    fi
+    submission_dir=$(prepare_submission "$submission")
+    submission_abs=$(cd "$submission_dir" && pwd)
+    mkdir -p "$RESULTS_DIR"
+    run_log="$RESULTS_DIR/docker.log"
+    if [ "$VERBOSE" -eq 1 ]; then
+      echo "=== Local Gradescope Runner ==="
+      echo " submission : $submission_abs"
+      echo " results    : $RESULTS_DIR"
+      echo " log        : $run_log"
+      echo " image      : $IMAGE_TAG"
+      echo "-------------------------------"
+    fi
+    start_ts=$(date +%s)
+    set +e
+    # Run autograder with spinner; verbose shows log afterward, quiet keeps log only.
+    docker run --rm $DOCKER_PLATFORM_FLAG \
+      -v "$PWD":/autograder/source \
+      -v "$submission_abs":/autograder/submission \
+      -v "$PWD/$RESULTS_DIR":/autograder/results \
+      -e VERBOSE="$VERBOSE" \
+      -e AG_VERBOSE="$VERBOSE" \
+      -e AG_HASH_VERBOSE="$HASH_VERBOSE" \
+      -e PYTHONUNBUFFERED=1 \
+      "$IMAGE_TAG" \
+      /bin/bash -lc "cd /autograder/source && ./run_autograder" \
+      >"$run_log" 2>&1 &
+    pipe_pid=$!
+    progress "$pipe_pid" "$start_ts" &
+    progress_pid=$!
+    wait "$pipe_pid"
+    run_rc=$?
+    if [ -n "$progress_pid" ]; then
+      kill "$progress_pid" 2>/dev/null || true
+      wait "$progress_pid" 2>/dev/null || true
+      progress_pid=""
+    fi
+    printf "\r" >&2
+    if [ "$VERBOSE" -eq 1 ]; then
+      cat "$run_log"
+    fi
+    set -e
+    # Print a concise summary from grader output/results using the autograder image
+    results_dir_path="$PWD/$RESULTS_DIR"
+    if [ -d "$results_dir_path" ]; then
+      echo "================ AUTOGRADER SUMMARY ================"
+      docker run --rm $DOCKER_PLATFORM_FLAG \
+        -e AG_VERBOSE="$VERBOSE" \
+        -e AG_HASH_VERBOSE="$HASH_VERBOSE" \
+        -v "$PWD":/autograder/source \
+        -v "$submission_abs":/autograder/submission \
+        -v "$results_dir_path":/autograder/results \
+        "$IMAGE_TAG" \
+        /bin/bash -lc '
+          set -e
+          cd /autograder/results
+          if [ -f results.json ]; then
+            python3 - <<'"'"'PY'"'"'
+import json, os, pathlib
+verbose = int(os.environ.get("AG_VERBOSE", "0"))
+hash_verbose = int(os.environ.get("AG_HASH_VERBOSE", "0"))
+path = pathlib.Path("results.json")
+hash_line = None
+hash_lines_full = []
+try:
+    hpath = pathlib.Path("grader_output.txt")
+    if hpath.is_file():
+        lines = hpath.read_text().splitlines()
+        hash_lines_full = [ln for ln in lines if ln.startswith("HASH REPORT") or ln.startswith("=") or ":" in ln or ln.startswith("Summary hash")]
+        for ln in lines:
+            if ln.startswith("Hash status:"):
+                hash_line = ln.strip()
+                break
+except Exception:
+    pass
+try:
+    data = json.loads(path.read_text())
+    score = data.get("score")
+    output = data.get("output")
+    auto_msgs = data.get("autograder_messages")
+    tests = data.get("tests")
+    if not isinstance(tests, list):
+        tests = []
+    total_vals = [t.get("max_score") for t in tests if isinstance(t, dict) and t.get("max_score") is not None]
+    total = sum(total_vals) if total_vals else None
+    final_line = f"Final score: {score}/{total}" if total is not None else f"Final score: {score}"
+    if hash_line:
+        print(hash_line)
+        if "MISMATCH" in hash_line.upper():
+            print("!!! HASH MISMATCH DETECTED — SCORE FORCED TO 0 !!!")
+        elif hash_verbose:
+            print("(hashes matched)")
+    elif hash_verbose:
+        print("Hash status: (not reported)")
+    print("***** FINAL SCORE *****")
+    print(final_line)
+    print("***********************")
+    if auto_msgs:
+        print("[autograder_messages]")
+        try:
+            for idx, msg in enumerate(auto_msgs, 1):
+                print(f"{idx}) {msg}")
+        except Exception:
+            print(auto_msgs)
+    if hash_verbose and hash_lines_full:
+        print("----- HASH REPORT (from grader_output) -----")
+        for ln in hash_lines_full:
+            print(ln)
+        print("--------------------------------------------")
+    if verbose:
+        if output:
+            print("[grader_output]")
+            print(output)
+        if tests:
+            print("[tests]")
+            for t in tests:
+                if not isinstance(t, dict):
+                    continue
+                name = t.get("name", "")
+                sc = t.get("score")
+                ms = t.get("max_score")
+                out = t.get("output")
+                print(f"- {name}: {sc}/{ms}")
+                if out:
+                    print(out)
+except Exception as e:
+    print(f"(could not parse results.json: {e})")
+PY
+          else
+            echo "(results.json not found)"
+          fi
+        '
+      echo "===================================================="
+      echo "NOTE: This is a local pre-check."
+      echo "You must still upload the generated submission zip to Gradescope."
+      echo "This reflects the grade you should expect there."
+    else
+      echo "[warn] results directory not found; skipping summary."
+    fi
+    echo "-------------------------------"
+    echo "Done (exit $run_rc). See $RESULTS_DIR for outputs (full log: $run_log)."
+    exit $run_rc
+    ;;
+
+  ""|-h|--help|help)
+    usage
+    ;;
+
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage
+    exit 1
+    ;;
+esac

@@ -1,0 +1,42 @@
+/*
+    CS 147 Spring 26
+    Homework #3, problem 2
+
+    Wrapper around the bypass register file for testing.
+*/
+module regFile_bypass_hier (
+                            // Outputs
+                            read1Data, read2Data, 
+                            // Inputs
+                            read1RegSel, read2RegSel, writeRegSel, writeData, writeEn
+                            );
+
+   input [2:0]  read1RegSel;
+   input [2:0]  read2RegSel;
+   input [2:0]  writeRegSel;
+   input [15:0] writeData;
+   input        writeEn;
+
+   output [15:0] read1Data;
+   output [15:0] read2Data;
+
+   wire          clk, rst;
+   wire          err;
+
+   // Ignore err for now
+   clkrst clk_generator(.clk(clk), .rst(rst), .err(err) );
+   regFile_bypass rf_b_0(
+                         // Outputs
+                         .read1Data                    (read1Data[15:0]),
+                         .read2Data                    (read2Data[15:0]),
+                         .err                          (err),
+                         // Inputs
+                         .clk                          (clk),
+                         .rst                          (rst),
+                         .read1RegSel                  (read1RegSel[2:0]),
+                         .read2RegSel                  (read2RegSel[2:0]),
+                         .writeRegSel                  (writeRegSel[2:0]),
+                         .writeData                    (writeData[15:0]),
+                         .writeEn                      (writeEn));
+
+endmodule

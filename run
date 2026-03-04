@@ -1,0 +1,1421 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Support Docker-in-Docker: if HOST_REPO_ROOT is set, we're inside a container
+# REPO_ROOT = host path (for Docker volume mounts)
+# LOCAL_REPO_ROOT = container path (for local file access)
+if [ -n "${HOST_REPO_ROOT:-}" ]; then
+  REPO_ROOT="$HOST_REPO_ROOT"
+  LOCAL_REPO_ROOT="/repo"
+else
+  REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+  LOCAL_REPO_ROOT="$REPO_ROOT"
+fi
+IMAGE_NAME="${DOCKER_IMAGE_NAME:-cs147-verilog-toolchain}"
+PROFILE_FILE_HOST="$LOCAL_REPO_ROOT/student_profile.env"
+LEGACY_CONFIG_HOST="$LOCAL_REPO_ROOT/config.json"
+TEST_FORCE=""
+SYNTH_HOST="coe-ee-cad15.sjsuad.sjsu.edu"
+SYNTH_REMOTE_BASE="code"
+PROFILE_ONLY=0
+
+# Normalize paths on MSYS/Git Bash (Windows)
+if command -v cygpath >/dev/null 2>&1; then
+  SCRIPT_DIR="$(cygpath -u "$SCRIPT_DIR")"
+  REPO_ROOT="$(cygpath -u "$REPO_ROOT")"
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: Docker is not installed or not on PATH. Install Docker Desktop and try again." >&2
+  exit 1
+fi
+
+if [ -z "$REPO_ROOT" ]; then
+  echo "Error: run must be executed inside the CS_147_Handouts git repository." >&2
+  exit 1
+fi
+
+# Skip PWD validation when inside container (using HOST_REPO_ROOT)
+if [ -z "${HOST_REPO_ROOT:-}" ]; then
+  case "$PWD/" in
+    "$REPO_ROOT/"*) ;;
+    *)
+      echo "Error: current directory ($PWD) is not inside the repository root ($REPO_ROOT)." >&2
+      exit 1
+      ;;
+  esac
+  REL_PATH="${PWD#"$REPO_ROOT"}"
+  REL_PATH="${REL_PATH#/}"
+  WORKDIR="/repo"
+  [ -n "$REL_PATH" ] && WORKDIR="/repo/$REL_PATH"
+else
+  # Inside container: use current directory relative to /repo
+  WORKDIR="$PWD"
+fi
+
+DOCKER_SOCK_VOLUME=()
+if [ -S /var/run/docker.sock ]; then
+  DOCKER_SOCK_VOLUME=(-v /var/run/docker.sock:/var/run/docker.sock)
+fi
+TTY_FLAGS=()
+if [ -t 0 ] && [ -t 1 ]; then
+  TTY_FLAGS=(-it)
+fi
+TTY_OPTS=()
+if [ ${#TTY_FLAGS[@]} -gt 0 ]; then
+  TTY_OPTS=("${TTY_FLAGS[@]}")
+fi
+SOCK_OPTS=()
+if [ ${#DOCKER_SOCK_VOLUME[@]} -gt 0 ]; then
+  SOCK_OPTS=("${DOCKER_SOCK_VOLUME[@]}")
+fi
+SELFTEST_LOG_DIR="$LOCAL_REPO_ROOT/assignments/.testing/selftest_logs"
+source "$LOCAL_REPO_ROOT/scripts/spinner.sh"
+DOCKER_PLATFORM_FLAG="${DOCKER_PLATFORM_FLAG:---platform linux/amd64}"
+SIM_PLATFORM_FLAG="${SIM_PLATFORM_FLAG:---platform linux/amd64}"
+
+print_help() {
+  cat <<'EOF'
+./run commands:
+  [Setup & Shell]
+    ./run setup                  Build the Docker image (uses DOCKER_IMAGE_NAME override if set), then prompt for student profile.
+    ./run shell                  Start an interactive shell in the container at the matching repo subdirectory.
+    ./run update                 Pull latest changes and re-run setup.
+    ./run help                   Show this help.
+    ./run <cmd>                  Run any command inside the container (e.g., make test, iverilog ...).
+
+  [Tests & Submission]
+    ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
+    ./run test project phase_1 [list|<test>] Run project Phase 1 tests (list or single test).
+    ./run test project ... -justtimer  Simulate project test timing only (no tests executed).
+    ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
+    ./run build_submission project phase_1 Build project Phase 1 submission package.
+    ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
+    ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see scripts/verilog_checker/verilog_checker.sh for details).
+    ./run wave_test              Generate VCD waveforms for the .testing mux examples.
+
+  [HW4 Tools]
+    ./run assemble <in> <out>    Run the WISC assembler (writes <out>_*.img and <out>.lst).
+    ./run assemble student_custom [test.asm] Assemble all custom tests, or one named test, into student_custom/assembled/.
+    ./run simulate <img>         Run the WISC simulator on a loadfile image.
+
+  [Synthesis]
+    ./run synth help                         Show synthesis wrapper help.
+    ./run synth init                         Copy synthesis support files to the school server.
+    ./run synth push <hw> [subproblem]       Push an assignment or one subproblem to the school server.
+    ./run synth add_list <hw> [subproblem]   Create empty list.txt file(s) in one or all local subproblem directories.
+    ./run synth check <hw> <subproblem> --top <module>
+                                            Run remote synthesis check (requires list.txt in subproblem dir).
+    ./run synth run <hw> <subproblem> --top <module> [--opt]
+                                            Run remote synthesis.
+    ./run synth pull <hw> <subproblem>       Pull remote synth output into synth_<subproblem>/ with one .old backup.
+    ./run synth shell                        Open an SSH shell on the school server.
+
+  [Debug]
+    ./run generate <name>        Run debug generators (e.g., ./run generate tools).
+    ./run generate hw4           Generate randomized HW4 opcode targets in hw4_1/targets.txt.
+    ./run generate writeup [hw]  Rebuild writeup PDFs locally (not intended for students).
+    ./run generate writeup project phase1  Rebuild project writeup PDFs (phase1/phase2/phase3).
+    ./run generate writeup project_common  Rebuild the shared project writeup PDF.
+    ./run generate writeup rules Rebuild the Verilog rules PDF locally (not intended for students).
+
+  [Student Info]
+    ./run student profile        Update student profile (name + student ID) without running full setup.
+
+  [Utilities]
+    ./run makeexecutable <path>  Mark a file executable (chmod +x).
+
+  [Cleanup]
+    ./run clean logs             Remove local self-test logs (and other clean target items).
+    ./run clean ta               Remove root-level *.out artifacts.
+    ./run clean docker           Remove toolchain/autograder images (prompts; optional config cleanup).
+    ./run clean turnins          Delete generated submission archives (prompts).
+    ./run clean student          Reset saved student profile.
+    ./run clean all              Run all clean_* targets (default if no subcommand).
+EOF
+}
+
+if [ "${1:-}" = "help" ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "--help-only" ]; then
+  print_help
+  exit 0
+fi
+
+if [ "${1:-}" = "update" ]; then
+  shift
+  # Student-editable files should be preserved during update conflict handling.
+  # Everything else is treated as infrastructure and resolved from remote.
+  is_student_editable_path() {
+    case "$1" in
+      assignments/hw0[1-6]/hw*/*) return 0 ;;
+      assignments/project/demo1/*) return 0 ;;
+      assignments/project/demo2/*) return 0 ;;
+      assignments/project/demo3/*) return 0 ;;
+      assignments/project/common/verilog/*.v) return 0 ;;
+      assignments/project/testprograms/student_custom/*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  discard_non_editable_tracked_changes() {
+    local changed path
+    changed="$(
+      {
+        git -C "$REPO_ROOT" diff --name-only
+        git -C "$REPO_ROOT" diff --cached --name-only
+      } | sort -u
+    )"
+    [ -n "$changed" ] || return 0
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      is_student_editable_path "$path" && continue
+      git -C "$REPO_ROOT" restore --staged --worktree -- "$path" 2>/dev/null || true
+    done <<<"$changed"
+  }
+
+  has_student_tracked_changes() {
+    local changed path
+    changed="$(
+      {
+        git -C "$REPO_ROOT" diff --name-only
+        git -C "$REPO_ROOT" diff --cached --name-only
+      } | sort -u
+    )"
+    [ -n "$changed" ] || return 1
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      if is_student_editable_path "$path"; then
+        return 0
+      fi
+    done <<<"$changed"
+    return 1
+  }
+
+  remove_non_editable_untracked_files() {
+    local untracked path
+    untracked="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard || true)"
+    [ -n "$untracked" ] || return 0
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      is_student_editable_path "$path" && continue
+      rm -rf "$REPO_ROOT/$path" 2>/dev/null || true
+    done <<<"$untracked"
+  }
+
+  resolve_non_editable_merge_conflicts_with_remote() {
+    local unmerged path has_student_conflict=0
+    unmerged="$(git -C "$REPO_ROOT" ls-files -u | awk '{print $4}' | sort -u)"
+    [ -n "$unmerged" ] || return 0
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      if is_student_editable_path "$path"; then
+        has_student_conflict=1
+        continue
+      fi
+      git -C "$REPO_ROOT" checkout --theirs -- "$path" 2>/dev/null || true
+      git -C "$REPO_ROOT" add -- "$path" 2>/dev/null || true
+    done <<<"$unmerged"
+
+    if [ "$has_student_conflict" -eq 1 ]; then
+      echo "[update] Merge conflicts detected in student-editable files. Please commit/stash your work and retry." >&2
+      git -C "$REPO_ROOT" diff --name-only --diff-filter=U >&2
+      return 1
+    fi
+
+    # Finalize auto-resolved infra merge.
+    if git -C "$REPO_ROOT" ls-files -u | grep -q .; then
+      return 1
+    fi
+    GIT_EDITOR=true git -C "$REPO_ROOT" commit --no-edit >/dev/null 2>&1 || true
+    return 0
+  }
+
+  sync_non_editable_from_remote() {
+    local current_branch remote_ref diff_paths path
+    current_branch="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    [ -n "$current_branch" ] || return 0
+    remote_ref="origin/$current_branch"
+    git -C "$REPO_ROOT" rev-parse --verify "$remote_ref" >/dev/null 2>&1 || return 0
+
+    # Only touch files that actually differ from remote to keep update fast.
+    diff_paths="$(git -C "$REPO_ROOT" diff --name-only --diff-filter=ACDMRT HEAD "$remote_ref" || true)"
+    [ -n "$diff_paths" ] || return 0
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      [ "$path" = "student_profile.env" ] && continue
+      [ "$path" = "config.json" ] && continue
+      [ "$path" = "config.json.bak" ] && continue
+      is_student_editable_path "$path" && continue
+      if git -C "$REPO_ROOT" cat-file -e "$remote_ref:$path" 2>/dev/null; then
+        git -C "$REPO_ROOT" restore --source="$remote_ref" --staged --worktree -- "$path" 2>/dev/null || true
+      else
+        git -C "$REPO_ROOT" restore --staged --worktree -- "$path" 2>/dev/null || true
+        rm -rf "$REPO_ROOT/$path" 2>/dev/null || true
+      fi
+    done <<<"$diff_paths"
+  }
+
+  # Auto-clean known generated artifacts that should never block updates.
+  # This specifically targets previously leaked files from local grading/turn-in runs.
+  cleanup_update_artifacts() {
+    local rel
+    for rel in \
+      "generated_turnins/hw01/.gitkeep" \
+      "generated_turnins/hw02/.gitkeep" \
+      "generated_turnins/hw03/.gitkeep" \
+      "generated_turnins/hw04/.gitkeep" \
+      "generated_turnins/hw05/.gitkeep" \
+      "generated_turnins/hw06/.gitkeep" \
+      "generated_turnins/project/.gitkeep" \
+      "generated_turnins/project_phase_1/.gitkeep" \
+      "assignments/hw02/Gradescope_Autograder_Template/__pycache__/grade.cpython-314.pyc" \
+      "assignments/hw03/Gradescope_Autograder_Template/__pycache__/grade.cpython-314.pyc" \
+      "assignments/hw04/Gradescope_Autograder_Template/__pycache__/grade.cpython-314.pyc" \
+      "assignments/project/demo1/Gradescope_Autograder_Template/__pycache__/grade.cpython-314.pyc" \
+      "assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/grade_tmp_submission.zip" \
+      "assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/project_phase_1_Nainoa Faulkner-Jackson_submission1.zip"; do
+      rm -f "$REPO_ROOT/$rel" || true
+    done
+
+    # Best-effort permissions repair for generated_turnins; avoids pull failures on stale files.
+    chmod -R u+rwX "$REPO_ROOT/generated_turnins" 2>/dev/null || true
+
+    # Remove local transient grader artifacts.
+    find "$REPO_ROOT/assignments" -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+    find "$REPO_ROOT/assignments" -type f -path "*/Gradescope_Autograder_Template/test_submissions/*.zip" -delete 2>/dev/null || true
+  }
+  cleanup_update_artifacts
+  discard_non_editable_tracked_changes
+
+  # Auto-clean only official handout writeup PDFs so student-generated PDFs are preserved.
+  # Official naming pattern:
+  #   - lab*.pdf
+  #   - project_phase_*.pdf
+  #   - wisc-sp22_spec.pdf
+  is_official_writeup_pdf() {
+    local base
+    base="$(basename "$1")"
+    case "$base" in
+      lab*.pdf|project_phase_*.pdf|wisc-sp22_spec.pdf) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  tracked_pdf_changes="$(
+    {
+      git -C "$REPO_ROOT" diff --name-only -- '*/writeup/*.pdf'
+      git -C "$REPO_ROOT" diff --cached --name-only -- '*/writeup/*.pdf'
+    } | sort -u
+  )"
+  if [ -n "$tracked_pdf_changes" ]; then
+    while IFS= read -r pdf_path; do
+      [ -n "$pdf_path" ] || continue
+      is_official_writeup_pdf "$pdf_path" || continue
+      git -C "$REPO_ROOT" restore --staged --worktree -- "$pdf_path" || true
+    done <<<"$tracked_pdf_changes"
+  fi
+  untracked_pdf_changes="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- '*/writeup/*.pdf' || true)"
+  if [ -n "$untracked_pdf_changes" ]; then
+    while IFS= read -r pdf_path; do
+      [ -n "$pdf_path" ] || continue
+      is_official_writeup_pdf "$pdf_path" || continue
+      rm -f "$REPO_ROOT/$pdf_path" || true
+    done <<<"$untracked_pdf_changes"
+  fi
+
+  if has_student_tracked_changes; then
+    echo "[update] Local changes detected. Please commit or back up your files before running update:" >&2
+    git -C "$REPO_ROOT" status --porcelain >&2
+    exit 1
+  fi
+  if ! git -C "$REPO_ROOT" pull --no-rebase; then
+    # Retry once after removing non-editable untracked files that can block merge.
+    remove_non_editable_untracked_files
+    if git -C "$REPO_ROOT" pull --no-rebase >/dev/null 2>&1; then
+      "$REPO_ROOT/run" setup "$@"
+      exit $?
+    fi
+
+    unmerged=$(git -C "$REPO_ROOT" ls-files -u | awk '{print $4}' | sort -u)
+    if [ -n "$unmerged" ]; then
+      if ! resolve_non_editable_merge_conflicts_with_remote; then
+        exit 1
+      fi
+    fi
+  fi
+  sync_non_editable_from_remote
+  "$REPO_ROOT/run" setup "$@"
+  exit $?
+fi
+
+synth_help() {
+  cat <<EOF
+Synthesis wrapper commands:
+  ./run synth init
+  ./run synth push <hw> [subproblem]
+  ./run synth add_list <hw> [subproblem]
+  ./run synth check <hw> <subproblem> --top <module>
+  ./run synth run <hw> <subproblem> --top <module> [--opt]
+  ./run synth pull <hw> <subproblem>
+  ./run synth shell
+
+Notes:
+  - VPN is required to access synthesis files. Please make sure Cisco Secure Client is running prior to using the above commands.
+  - A list.txt file is required in the local subproblem directory for check/run. Create this file yourself and place it in the homework subproblem folder you wish to synthesize, or use ./run synth add_list <hw> [subproblem] to initialize an empty list file automatically.
+EOF
+}
+
+get_student_id_host() {
+  local sid=""
+  if [ -f "$PROFILE_FILE_HOST" ]; then
+    # shellcheck disable=SC1090
+    source "$PROFILE_FILE_HOST" 2>/dev/null || true
+    sid="${STUDENT_ID:-}"
+  fi
+  printf "%s" "$sid"
+}
+
+normalize_hw_token() {
+  local tok
+  tok="$(printf "%s" "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$tok" in
+    hw01|hw1) echo "hw01" ;;
+    hw02|hw2) echo "hw02" ;;
+    hw03|hw3) echo "hw03" ;;
+    hw04|hw4) echo "hw04" ;;
+    hw05|hw5) echo "hw05" ;;
+    hw06|hw6) echo "hw06" ;;
+    *) return 1 ;;
+  esac
+}
+
+hw_number_from_norm() {
+  local norm="$1"
+  case "$norm" in
+    hw01) echo "1" ;;
+    hw02) echo "2" ;;
+    hw03) echo "3" ;;
+    hw04) echo "4" ;;
+    hw05) echo "5" ;;
+    hw06) echo "6" ;;
+    *) return 1 ;;
+  esac
+}
+
+hw4_opcode_from_letter() {
+  local letter="$1"
+  case "$letter" in
+    A) printf "ROLI" ;;
+    B) printf "SLLI" ;;
+    C) printf "RORI" ;;
+    D) printf "SRLI" ;;
+    E) printf "ST" ;;
+    F) printf "LD" ;;
+    G) printf "STU" ;;
+    H) printf "BTR" ;;
+    I) printf "ROL" ;;
+    J) printf "SRL" ;;
+    K) printf "ROR" ;;
+    L) printf "SLL" ;;
+    M) printf "SEQ" ;;
+    N) printf "SLT" ;;
+    O) printf "SLE" ;;
+    Q) printf "SCO" ;;
+    R) printf "SIIC or RTI" ;;
+    S) printf "SLBI" ;;
+    T) printf "JR" ;;
+    U) printf "JAL" ;;
+    V) printf "JALR" ;;
+    W) printf "XOR or XORI" ;;
+    X) printf "ANDN or ANDNI" ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_subproblem_for_hw() {
+  local hw_norm="$1"
+  local sub="$2"
+  local hw_num
+  hw_num="$(hw_number_from_norm "$hw_norm")" || return 1
+  case "$sub" in
+    "hw${hw_num}_"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+synth_require_tools() {
+  local missing=0 missing_list=()
+  if ! command -v ssh >/dev/null 2>&1; then
+    echo "[synth] Missing dependency: ssh" >&2
+    missing=1
+    missing_list+=("ssh")
+  fi
+  if ! command -v tar >/dev/null 2>&1; then
+    echo "[synth] Missing dependency: tar" >&2
+    missing=1
+    missing_list+=("tar")
+  fi
+  if [ "$missing" -eq 1 ]; then
+    echo "[synth] Required synth dependencies are missing: ${missing_list[*]}" >&2
+    echo "[synth] Install the missing tools and retry." >&2
+    echo "  Ubuntu/WSL: sudo apt update && sudo apt install -y openssh-client tar" >&2
+    echo "  macOS: install Xcode Command Line Tools (xcode-select --install)" >&2
+    exit 1
+  fi
+}
+
+synth_require_student_id() {
+  SYNTH_USER="$(get_student_id_host)"
+  if ! [[ "$SYNTH_USER" =~ ^[0-9]{9}$ ]]; then
+    echo "[synth] Missing/invalid student ID in student_profile.env." >&2
+    echo "[synth] Run: ./run student profile" >&2
+    exit 1
+  fi
+}
+
+synth_require_vpn_reachability() {
+  local out rc
+  set +e
+  out="$(
+    ssh -o BatchMode=yes -o ConnectTimeout=5 \
+      -o PreferredAuthentications=none -o PubkeyAuthentication=no -o PasswordAuthentication=no \
+      "${SYNTH_USER}@${SYNTH_HOST}" true 2>&1
+  )"
+  rc=$?
+  set -e
+  if [ $rc -eq 0 ]; then
+    return 0
+  fi
+  if printf "%s" "$out" | grep -qiE "permission denied|authentication failed|authentic"; then
+    return 0
+  fi
+  echo "Please make sure Cisco Secure Client is enabled to use Synthesis commands" >&2
+  exit 1
+}
+
+if [ "${1:-}" = "verilog_checker" ]; then
+  shift
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" bash /repo/scripts/verilog_checker/verilog_checker.sh "$@"
+fi
+
+if [ "${1:-}" = "test" ]; then
+  shift
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" bash /repo/assignments/.testing/test_runner.sh "$@"
+fi
+
+if [ "${1:-}" = "assemble" ]; then
+  shift
+  if [ "${1:-}" = "student_custom" ] && [ "$#" -ge 1 ] && [ "$#" -le 2 ]; then
+    custom_dir="$REPO_ROOT/assignments/project/testprograms/student_custom"
+    assembled_dir="$custom_dir/assembled"
+    if [ ! -d "$custom_dir" ]; then
+      echo "[assemble] Missing student custom directory: $custom_dir" >&2
+      exit 1
+    fi
+    assemble_one_custom() {
+      local name="$1"
+      local stem="${name%.asm}"
+      local in_repo="/repo/assignments/project/testprograms/student_custom/$name"
+      local out_repo="/repo/assignments/project/testprograms/student_custom/assembled/$stem"
+      echo "[assemble] $name -> ${stem}.img"
+      if docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/assembler/assemble.sh "$in_repo" "$out_repo"; then
+        # Keep only one .img artifact matching the source test name.
+        rm -f "$assembled_dir/${stem}.img"
+        if [ -f "$assembled_dir/${stem}_all.img" ]; then
+          mv -f "$assembled_dir/${stem}_all.img" "$assembled_dir/${stem}.img"
+        fi
+        rm -f \
+          "$assembled_dir/${stem}_0.img" \
+          "$assembled_dir/${stem}_1.img" \
+          "$assembled_dir/${stem}_2.img" \
+          "$assembled_dir/${stem}_3.img"
+        return 0
+      fi
+      return 1
+    }
+
+    if [ "$#" -eq 2 ]; then
+      test_name="$2"
+      case "$test_name" in
+        *.asm) ;;
+        *) echo "[assemble] Expected test filename with .asm extension (for example: my_test.asm)." >&2; exit 1 ;;
+      esac
+      if [ ! -f "$custom_dir/$test_name" ]; then
+        echo "[assemble] Test not found: $custom_dir/$test_name" >&2
+        exit 1
+      fi
+      mkdir -p "$assembled_dir"
+      if assemble_one_custom "$test_name"; then
+        echo "[assemble] Completed. success: 1  failed: 0  out: $assembled_dir"
+        exit 0
+      fi
+      echo "[assemble] Completed. success: 0  failed: 1  out: $assembled_dir" >&2
+      exit 1
+    fi
+
+    shopt -s nullglob
+    asm_files=("$custom_dir"/*.asm)
+    shopt -u nullglob
+    count=${#asm_files[@]}
+    proceed=0
+
+    case "$count" in
+      0)
+        echo "[assemble] No .asm files found in $custom_dir." >&2
+        echo "[assemble] Add tests and retry, or run ./run assemble <in> <out>." >&2
+        exit 1
+        ;;
+      [1-9]|10)
+        proceed=1
+        ;;
+      1[1-9]|2[0-9]|30)
+        echo "[assemble] Found $count tests in $custom_dir:"
+        for f in "${asm_files[@]}"; do
+          echo "  - $(basename "$f")"
+        done
+        printf "Assemble all files? [Y/n]: "
+        read -r confirm
+        case "$confirm" in
+          ""|y|Y|yes|YES) proceed=1 ;;
+          *) proceed=0 ;;
+        esac
+        ;;
+      *)
+        echo "[assemble] Warning: Found $count tests in $custom_dir."
+        echo "[assemble] This is a large batch and may take significant time."
+        printf "Proceed with assembling all files? [Y/n]: "
+        read -r confirm
+        case "$confirm" in
+          ""|y|Y|yes|YES) proceed=1 ;;
+          *) proceed=0 ;;
+        esac
+        ;;
+    esac
+
+    if [ "$proceed" -ne 1 ]; then
+      echo "[assemble] Aborted."
+      exit 1
+    fi
+
+    mkdir -p "$assembled_dir"
+    ok_count=0
+    fail_count=0
+    for f in "${asm_files[@]}"; do
+      name="$(basename "$f")"
+      if assemble_one_custom "$name"; then
+        ok_count=$((ok_count + 1))
+      else
+        fail_count=$((fail_count + 1))
+      fi
+    done
+    echo "[assemble] Completed. success: $ok_count  failed: $fail_count  out: $assembled_dir"
+    if [ "$fail_count" -gt 0 ]; then
+      exit 1
+    fi
+    exit 0
+  fi
+  exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/assembler/assemble.sh "$@"
+fi
+
+if [ "${1:-}" = "simulate" ]; then
+  shift
+  exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w "$WORKDIR" "$IMAGE_NAME" /repo/assignments/tools/simulator/wiscalculator "$@"
+fi
+
+if [ "${1:-}" = "generate" ]; then
+  shift
+  subcmd="${1:-}"
+  if [ -z "$subcmd" ]; then
+    echo "Usage: ./run generate <name>" >&2
+    echo "Available: tools, hw4, writeup" >&2
+    exit 1
+  fi
+  shift || true
+  case "$subcmd" in
+    tools)
+      exec docker run --rm $SIM_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo "$IMAGE_NAME" /repo/assignments/tools/TA/assembler_simulator_testing/run_tests.sh "$@"
+      ;;
+    hw4|hw04)
+      targets_file="$REPO_ROOT/assignments/hw04/hw4_1/targets.txt"
+      if [ -f "$targets_file" ]; then
+        echo "[generate] targets file already exists: assignments/hw04/hw4_1/targets.txt" >&2
+        echo "[generate] Refusing to regenerate existing targets." >&2
+        exit 1
+      fi
+      mkdir -p "$(dirname "$targets_file")"
+      pool=(A B C D E F G H I J K L M N O Q R S T U V W X)
+      picks=()
+      for _i in 1 2 3; do
+        idx=$((RANDOM % ${#pool[@]}))
+        picks+=("${pool[$idx]}")
+        pool=("${pool[@]:0:$idx}" "${pool[@]:$((idx+1))}")
+      done
+      {
+        echo "# HW4 Problem 1 assigned opcode letters"
+        echo "# Order maps to: p1-1.asm, p1-2.asm, p1-3.asm"
+        printf "%s\n" "${picks[@]}"
+      } >"$targets_file"
+      echo "[generate] Wrote targets: assignments/hw04/hw4_1/targets.txt"
+      i=1
+      for letter in "${picks[@]}"; do
+        opcode="$(hw4_opcode_from_letter "$letter" || true)"
+        echo "  p1-$i.asm -> $letter ($opcode)"
+        i=$((i + 1))
+      done
+      exit 0
+      ;;
+    writeup)
+      echo "[writeup] Warning: writeup generation runs locally and is not intended for student use."
+      target_hw="${1:-}"
+      if [ "$target_hw" = "rules" ]; then
+        exec "$REPO_ROOT/scripts/writeup/build_writeup.sh" rules
+      fi
+      if [ -z "$target_hw" ]; then
+        echo "[writeup] No assignment specified."
+        echo "[writeup] This will overwrite all existing writeup PDFs."
+        printf "Proceed? [Y/n]: "
+        read -r confirm
+        case "$confirm" in
+          ""|y|Y|yes|YES) ;;
+          *) echo "[writeup] Aborted."; exit 1 ;;
+        esac
+        hw_list=()
+        while IFS= read -r hw; do
+          [ -n "$hw" ] && hw_list+=("$hw")
+        done < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+        if [ ${#hw_list[@]} -eq 0 ]; then
+          echo "[writeup] No assignments found under $REPO_ROOT/assignments." >&2
+          exit 1
+        fi
+        exec "$REPO_ROOT/scripts/writeup/build_writeup.sh" "${hw_list[@]}"
+      fi
+      exec "$REPO_ROOT/scripts/writeup/build_writeup.sh" "$@"
+      ;;
+    *)
+      echo "Unknown generate target: $subcmd" >&2
+      echo "Available: tools, hw4, writeup" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+if [ "${1:-}" = "makeexecutable" ]; then
+  shift
+  if [ $# -ne 1 ]; then
+    echo "Usage: ./run makeexecutable <path>" >&2
+    exit 1
+  fi
+  target_input="$1"
+  if [ "${target_input#/}" = "$target_input" ]; then
+    target_path="$PWD/$target_input"
+  else
+    target_path="$target_input"
+  fi
+  target_dir="$(cd "$(dirname "$target_path")" && pwd -P)"
+  target_base="$(basename "$target_path")"
+  target_path="$target_dir/$target_base"
+  case "$target_path/" in
+    "$REPO_ROOT/"*) ;;
+    *)
+      echo "Error: path must be inside repo: $target_path" >&2
+      exit 1
+      ;;
+  esac
+  if [ ! -e "$target_path" ]; then
+    echo "Error: file not found: $target_path" >&2
+    exit 1
+  fi
+  chmod +x "$target_path"
+  echo "[makeexecutable] chmod +x $target_path"
+  exit 0
+fi
+
+case "${1:-}" in
+  synth)
+    shift || true
+    synth_cmd="${1:-help}"
+    shift || true
+
+    if [ "$synth_cmd" = "help" ]; then
+      synth_help
+      exit 0
+    fi
+
+    synth_require_tools
+    synth_require_student_id
+    synth_require_vpn_reachability
+
+    synth_target="${SYNTH_USER}@${SYNTH_HOST}"
+
+    synth_require_hw() {
+      local hw_in="$1"
+      if ! hw_norm="$(normalize_hw_token "$hw_in")"; then
+        echo "[synth] Invalid assignment token: $hw_in" >&2
+        echo "[synth] Use hw1..hw6 (or hw01..hw06)." >&2
+        exit 1
+      fi
+      hw_num="$(hw_number_from_norm "$hw_norm")"
+      hw_root_local="$REPO_ROOT/assignments/$hw_norm"
+      if [ ! -d "$hw_root_local" ]; then
+        echo "[synth] Missing local assignment directory: $hw_root_local" >&2
+        exit 1
+      fi
+    }
+
+    synth_require_subproblem() {
+      local hw_norm_arg="$1"
+      local sub_arg="$2"
+      if ! validate_subproblem_for_hw "$hw_norm_arg" "$sub_arg"; then
+        echo "[synth] Invalid subproblem '$sub_arg' for assignment '$hw_norm_arg'." >&2
+        exit 1
+      fi
+      sub_local="$REPO_ROOT/assignments/$hw_norm_arg/$sub_arg"
+      if [ ! -d "$sub_local" ]; then
+        echo "[synth] Missing local subproblem directory: $sub_local" >&2
+        exit 1
+      fi
+    }
+
+    case "$synth_cmd" in
+      init)
+        if [ ! -f "$REPO_ROOT/assignments/tools/synth/.synopsys_dc.setup" ]; then
+          echo "[synth] Missing local setup file: assignments/tools/synth/.synopsys_dc.setup" >&2
+          exit 1
+        fi
+        if [ ! -f "$REPO_ROOT/assignments/tools/synth/synth.pl" ]; then
+          echo "[synth] Missing local script: assignments/tools/synth/synth.pl" >&2
+          exit 1
+        fi
+        echo "[synth] Copying synthesis support files to remote home (single SSH session)..."
+        COPYFILE_DISABLE=1 tar --format ustar -C "$REPO_ROOT/assignments/tools/synth" -cf - .synopsys_dc.setup synth.pl | \
+          ssh "$synth_target" "set -e; rm -rf ~/.synopsys_dc.setup ~/.synopsys.dc_setup ~/synth.pl; tar -xf - -C ~"
+        echo "[synth] init complete."
+        exit 0
+        ;;
+      push)
+        if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+          echo "Usage: ./run synth push <hw> [subproblem]" >&2
+          exit 1
+        fi
+        synth_require_hw "$1"
+        if [ $# -eq 1 ]; then
+          echo "[synth] Deleting remote ~/code/$hw_norm and pushing fresh assignment copy..."
+          tar -C "$REPO_ROOT/assignments" -cf - "$hw_norm" | \
+            ssh "$synth_target" "set -e; rm -rf ~/$SYNTH_REMOTE_BASE/$hw_norm; mkdir -p ~/$SYNTH_REMOTE_BASE; tar -xf - -C ~/$SYNTH_REMOTE_BASE"
+        else
+          sub="$2"
+          synth_require_subproblem "$hw_norm" "$sub"
+          echo "[synth] Deleting remote ~/code/$hw_norm and pushing only $sub..."
+          tar -C "$REPO_ROOT/assignments/$hw_norm" -cf - "$sub" | \
+            ssh "$synth_target" "set -e; rm -rf ~/$SYNTH_REMOTE_BASE/$hw_norm; mkdir -p ~/$SYNTH_REMOTE_BASE/$hw_norm; tar -xf - -C ~/$SYNTH_REMOTE_BASE/$hw_norm"
+        fi
+        echo "[synth] push complete."
+        exit 0
+        ;;
+      add_list)
+        if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+          echo "Usage: ./run synth add_list <hw> [subproblem]" >&2
+          exit 1
+        fi
+        synth_require_hw "$1"
+        if [ $# -eq 2 ]; then
+          sub="$2"
+          synth_require_subproblem "$hw_norm" "$sub"
+          list_path="$REPO_ROOT/assignments/$hw_norm/$sub/list.txt"
+          : > "$list_path"
+          echo "[synth] Created: assignments/$hw_norm/$sub/list.txt"
+        else
+          created_any=0
+          for sub_dir in "$REPO_ROOT/assignments/$hw_norm/${hw_norm}"_*; do
+            [ -d "$sub_dir" ] || continue
+            : > "$sub_dir/list.txt"
+            rel_sub="$(basename "$sub_dir")"
+            echo "[synth] Created: assignments/$hw_norm/$rel_sub/list.txt"
+            created_any=1
+          done
+          if [ "$created_any" -eq 0 ]; then
+            echo "[synth] No subproblem directories found under assignments/$hw_norm." >&2
+            exit 1
+          fi
+        fi
+        exit 0
+        ;;
+      check|run)
+        if [ $# -lt 2 ]; then
+          echo "Usage: ./run synth $synth_cmd <hw> <subproblem> --top <module> [--opt(run only)]" >&2
+          exit 1
+        fi
+        synth_require_hw "$1"
+        sub="$2"
+        shift 2
+        synth_require_subproblem "$hw_norm" "$sub"
+        top=""
+        opt_flag=""
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --top)
+              if [ $# -lt 2 ]; then
+                echo "[synth] --top requires a module name." >&2
+                exit 1
+              fi
+              top="${2:-}"
+              shift 2
+              ;;
+            --opt)
+              opt_flag="--opt"
+              shift
+              ;;
+            *)
+              echo "[synth] Unknown argument: $1" >&2
+              exit 1
+              ;;
+          esac
+        done
+        if [ -z "$top" ]; then
+          echo "[synth] --top <module> is required." >&2
+          exit 1
+        fi
+        if [ "$synth_cmd" = "check" ] && [ -n "$opt_flag" ]; then
+          echo "[synth] --opt is only valid for 'run'." >&2
+          exit 1
+        fi
+        if [ ! -f "$REPO_ROOT/assignments/$hw_norm/$sub/list.txt" ]; then
+          echo "[synth] Missing required file: assignments/$hw_norm/$sub/list.txt" >&2
+          echo "[synth] Create list.txt (one Verilog filename per line) and retry." >&2
+          exit 1
+        fi
+        remote_dir="~/$SYNTH_REMOTE_BASE/$hw_norm/$sub"
+        remote_cmd_type="$synth_cmd"
+        [ "$synth_cmd" = "run" ] && remote_cmd_type="synth"
+        ssh "$synth_target" "csh -c 'source /apps/design_environment.csh; cd $remote_dir; perl ~/synth.pl --list=list.txt --type=other --cmd=$remote_cmd_type --top=$top $opt_flag'"
+        exit $?
+        ;;
+      pull)
+        if [ $# -ne 2 ]; then
+          echo "Usage: ./run synth pull <hw> <subproblem>" >&2
+          exit 1
+        fi
+        synth_require_hw "$1"
+        sub="$2"
+        synth_require_subproblem "$hw_norm" "$sub"
+        remote_synth_dir="~/$SYNTH_REMOTE_BASE/$hw_norm/$sub/synth"
+        active_dir="$REPO_ROOT/assignments/$hw_norm/$sub/synth_$sub"
+        old_dir="${active_dir}.old"
+        if [ -d "$active_dir" ]; then
+          if [ -d "$old_dir" ]; then
+            echo "[synth] Warning: existing backup '$old_dir' will be overwritten." >&2
+          fi
+          rm -rf "$old_dir"
+          mv "$active_dir" "$old_dir"
+        fi
+        tmp_pull_dir="$REPO_ROOT/assignments/$hw_norm/$sub/.synth_pull_tmp_$$"
+        rm -rf "$tmp_pull_dir"
+        mkdir -p "$tmp_pull_dir"
+        if ! ssh "$synth_target" "set -e; test -d $remote_synth_dir; tar -C $remote_synth_dir -cf - ." | tar -C "$tmp_pull_dir" -xf -; then
+          rm -rf "$tmp_pull_dir"
+          echo "[synth] Remote synth output not found at $remote_synth_dir" >&2
+          exit 1
+        fi
+        mv "$tmp_pull_dir" "$active_dir"
+        echo "[synth] Pulled synth output to: $active_dir"
+        [ -d "$old_dir" ] && echo "[synth] Previous output moved to: $old_dir"
+        exit 0
+        ;;
+      shell)
+        exec ssh "$synth_target"
+        ;;
+      *)
+        echo "Unknown synth command: $synth_cmd" >&2
+        synth_help >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  build_submission|submit)
+    target="submit"
+    shift
+    nograde="0"
+    justgrade="0"
+    submit_verbose="0"
+    submit_hash_verbose="0"
+    assignment_arg=""
+    project_phase_arg=""
+    declare -a extra_make_args=()
+    # Parse flags anywhere; first non-flag target token is the assignment.
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        -nograde) nograde="1" ;;
+        -justgrade) justgrade="1" ;;
+        -v|--verbose) submit_verbose="1" ;;
+        -vh) submit_hash_verbose="1" ;;
+        all) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
+        project) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
+        hw[0-9]*) if [ -z "$assignment_arg" ]; then assignment_arg="$1"; else extra_make_args+=("$1"); fi ;;
+        phase1|phase_1|1)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_1"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
+        *) extra_make_args+=("$1") ;;
+      esac
+      shift
+    done
+    if [ -z "$assignment_arg" ]; then
+      echo "[submit] assignment name required (e.g., hw01, hw1, project, or all)" >&2
+      exit 1
+    fi
+    if [ "$assignment_arg" = "all" ]; then
+      submit_flags=()
+      [ "$nograde" = "1" ] && submit_flags+=("-nograde")
+      [ "$justgrade" = "1" ] && submit_flags+=("-justgrade")
+      [ "$submit_verbose" = "1" ] && submit_flags+=("-v")
+      [ "$submit_hash_verbose" = "1" ] && submit_flags+=("-vh")
+      if [ ${#extra_make_args[@]} -gt 0 ]; then
+        submit_flags+=("${extra_make_args[@]}")
+      fi
+      assignments=()
+      while IFS= read -r hw; do
+        [ -n "$hw" ] && assignments+=("$hw")
+      done < <(ls -d "$REPO_ROOT/assignments"/hw[0-9][0-9] 2>/dev/null | xargs -n1 basename | sort)
+      if [ ${#assignments[@]} -eq 0 ]; then
+        echo "[submit] no assignments found under $REPO_ROOT/assignments" >&2
+        exit 1
+      fi
+      rc=0
+      for hw in "${assignments[@]}"; do
+        if [ ${#submit_flags[@]} -gt 0 ]; then
+          "$REPO_ROOT/run" submit "${submit_flags[@]}" "$hw" || rc=$?
+        else
+          "$REPO_ROOT/run" submit "$hw" || rc=$?
+        fi
+        echo
+      done
+      exit $rc
+    fi
+    # Normalize hw number (accept hw1 or hw01)
+    case "$assignment_arg" in
+      hw[0-9]) assignment_arg=$(printf "hw%02d" "${assignment_arg#hw}") ;;
+    esac
+    if [ "$assignment_arg" = "project" ]; then
+      if [ -z "$project_phase_arg" ]; then
+        project_phase_arg="phase_1"
+      fi
+      if [ ${#extra_make_args[@]} -gt 0 ]; then
+        extra_make_args=("PROJECT_PHASE=$project_phase_arg" "${extra_make_args[@]}")
+      else
+        extra_make_args=("PROJECT_PHASE=$project_phase_arg")
+      fi
+    fi
+    if [ ${#extra_make_args[@]} -gt 0 ]; then
+      set -- "$assignment_arg" "${extra_make_args[@]}"
+    else
+      set -- "$assignment_arg"
+    fi
+    # Run submit inside the container first.
+    docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
+      -e HOST_REPO_ROOT="$REPO_ROOT" -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
+      -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
+    rc=$?
+    if [ $rc -ne 0 ]; then
+      exit $rc
+    fi
+    # Host-side autograder run unless -nograde
+    if [ "$nograde" = "1" ]; then
+      echo "[submit] host autograder skipped (nograde)"
+      exit 0
+    fi
+    # Normalize hw number (accept hw1 or hw01)
+    case "$assignment_arg" in
+      hw[0-9]) assignment_arg=$(printf "hw%02d" "${assignment_arg#hw}") ;;
+    esac
+    marker_path="$REPO_ROOT/assignments/$assignment_arg/.last_submit_zip"
+    if [ ! -f "$marker_path" ]; then
+      echo "[submit] marker file not found for host autograder: $marker_path" >&2
+      exit 1
+    fi
+    rel_entry=$(cat "$marker_path")
+    zip_name="${rel_entry##*/}"
+    if [ "$assignment_arg" = "project" ]; then
+      case "$project_phase_arg" in
+        phase_1) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
+        phase_2) grader_dir="$REPO_ROOT/assignments/project/demo2/Gradescope_Autograder_Template" ;;
+        phase_3) grader_dir="$REPO_ROOT/assignments/project/demo3/Gradescope_Autograder_Template" ;;
+        *) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
+      esac
+    else
+      grader_dir="$REPO_ROOT/assignments/$assignment_arg/Gradescope_Autograder_Template"
+    fi
+    if [ ! -d "$grader_dir" ]; then
+      echo "[submit] Gradescope_Autograder_Template not found for $assignment_arg; skipping host autograder." >&2
+      exit 1
+    fi
+    echo "[submit] running host autograder..."
+    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "test_submissions/$zip_name")
+    grade_rc=$?
+    turnin_subdir="$assignment_arg"
+    if [ "$assignment_arg" = "project" ]; then
+      turnin_subdir="project_${project_phase_arg}"
+    fi
+    turnin_path="generated_turnins/$turnin_subdir/$zip_name"
+    if [ -f "$REPO_ROOT/$turnin_path" ]; then
+      echo "-------------------------------"
+      echo "[submit] submission zip ready:"
+      echo "  $turnin_path"
+      echo "-------------------------------"
+    else
+      echo "-------------------------------"
+      echo "[submit] submission zip ready:"
+      if [ "$assignment_arg" = "project" ]; then
+        echo "  assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name"
+      else
+        echo "  assignments/$assignment_arg/Gradescope_Autograder_Template/test_submissions/$zip_name"
+      fi
+      echo "-------------------------------"
+    fi
+    echo "[submit] cleaning autograder artifacts..."
+    (cd "$grader_dir" && make clean >/dev/null 2>&1 || true)
+    exit $grade_rc
+    ;;
+  clean)
+    shift
+    clean_target="${1:-all}"
+    case "$clean_target" in
+      logs)      make_target="clean_logs" ;;
+      docker)    make_target="clean_docker" ;;
+      turnins)   make_target="clean_turnins" ;;
+      student)   make_target="clean_student_name" ;;
+      ta)        make_target="clean_ta" ;;
+      all)       make_target="clean" ;;
+      *) echo "Usage: ./run clean [logs|docker|turnins|student|ta|all]" >&2; exit 1 ;;
+    esac
+    shift || true
+    exec make "$make_target" "$@"
+    ;;
+  student)
+    shift || true
+    subcmd="${1:-}"
+    case "$subcmd" in
+      profile)
+        shift || true
+        exec "$REPO_ROOT/run" setup --profile-only "$@"
+        ;;
+      *)
+        echo "Usage: ./run student profile" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  wave_test)
+    shift
+    exec docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -e HOST_REPO_ROOT="$REPO_ROOT" -w /repo "$IMAGE_NAME" make "wave_test" "$@"
+    ;;
+  student_name|student_profile)
+    echo "Deprecated command. Use: ./run student profile" >&2
+    exit 1
+    ;;
+esac
+
+ensure_profile_writable() {
+  local profile_path="$1"
+  local profile_dir
+  profile_dir="$(dirname "$profile_path")"
+  if [ -e "$profile_path" ]; then
+    if [ ! -w "$profile_path" ]; then
+      echo "Warning: student profile is not writable: $profile_path" >&2
+      if command -v sudo >/dev/null 2>&1; then
+        printf "Fix permissions now using sudo? [y/N]: " >&2
+        read -r fix_confirm
+        case "$fix_confirm" in
+          y|Y|yes|YES)
+            sudo chown "$USER:$USER" "$profile_path" && chmod u+rw "$profile_path" || {
+              echo "Error: failed to fix permissions for $profile_path" >&2
+              exit 1
+            }
+            ;;
+          *)
+            echo "Error: student profile is not writable: $profile_path" >&2
+            echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$profile_path\" && chmod u+rw \"$profile_path\"" >&2
+            exit 1
+            ;;
+        esac
+      else
+        echo "Error: student profile is not writable: $profile_path" >&2
+        echo "Fix (WSL/Linux): sudo chown $USER:$USER \"$profile_path\" && chmod u+rw \"$profile_path\"" >&2
+        exit 1
+      fi
+    fi
+  else
+    if [ ! -w "$profile_dir" ]; then
+      echo "Warning: student profile cannot be created in: $profile_dir" >&2
+      if command -v sudo >/dev/null 2>&1; then
+        printf "Fix permissions now using sudo? [y/N]: " >&2
+        read -r fix_confirm
+        case "$fix_confirm" in
+          y|Y|yes|YES)
+            sudo chown -R "$USER:$USER" "$profile_dir" || {
+              echo "Error: failed to fix permissions for $profile_dir" >&2
+              exit 1
+            }
+            ;;
+          *)
+            echo "Error: student profile cannot be created in: $profile_dir" >&2
+            echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$profile_dir\"" >&2
+            exit 1
+            ;;
+        esac
+      else
+        echo "Error: student profile cannot be created in: $profile_dir" >&2
+        echo "Fix (WSL/Linux): sudo chown -R $USER:$USER \"$profile_dir\"" >&2
+        exit 1
+      fi
+    fi
+  fi
+}
+
+get_student_profile_host() {
+  local name="" sid=""
+  if [ -f "$PROFILE_FILE_HOST" ]; then
+    # shellcheck disable=SC1090
+    source "$PROFILE_FILE_HOST" 2>/dev/null || true
+    name="${STUDENT_NAME:-}"
+    sid="${STUDENT_ID:-}"
+  fi
+  printf "%s\t%s" "$name" "$sid"
+}
+
+write_student_profile_host() {
+  local name="$1"
+  local sid="$2"
+  local tmp="$PROFILE_FILE_HOST.tmp"
+  umask 077
+  {
+    printf "STUDENT_NAME=%q\n" "$name"
+    printf "STUDENT_ID=%q\n" "$sid"
+  } >"$tmp"
+  mv -f "$tmp" "$PROFILE_FILE_HOST"
+}
+
+print_student_profile_current_host() {
+  local profile_line name sid
+  profile_line="$(get_student_profile_host)"
+  name="${profile_line%%$'\t'*}"
+  sid="${profile_line#*$'\t'}"
+  [ -z "$name" ] && name="(not set)"
+  [ -z "$sid" ] && sid="(not set)"
+  echo "Student profile:"
+  printf "  %-11s %s\n" "Name:" "$name"
+  printf "  %-11s %s\n" "Student ID:" "$sid"
+}
+
+prompt_student_name() {
+  local value=""
+  while [ -z "$value" ]; do
+    read -r -p "Enter your name (for submissions): " value
+    if [ -z "$value" ]; then
+      echo "Name cannot be empty." >&2
+    fi
+  done
+  printf "%s" "$value"
+}
+
+prompt_student_id() {
+  local value=""
+  while :; do
+    read -r -p "Enter your student ID (9 digits): " value
+    if [[ "$value" =~ ^[0-9]{9}$ ]]; then
+      printf "%s" "$value"
+      return
+    fi
+    echo "Student ID must be exactly 9 numeric digits." >&2
+  done
+}
+
+if [ "${1:-}" = "setup" ]; then
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --test-force=*)
+        TEST_FORCE="${1#*=}"
+        ;;
+      --profile-only)
+        PROFILE_ONLY=1
+        ;;
+      *)
+        echo "Unknown setup option: $1" >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+  if [ -f "$REPO_ROOT/assignments/tools/assembler/assemble.sh" ]; then
+    chmod +x "$REPO_ROOT/assignments/tools/assembler/assemble.sh"
+  fi
+  if [ -f "$REPO_ROOT/assignments/tools/simulator/wiscalculator" ]; then
+    chmod +x "$REPO_ROOT/assignments/tools/simulator/wiscalculator"
+  fi
+
+  profile_line="$(get_student_profile_host)"
+  existing_name="${profile_line%%$'\t'*}"
+  existing_id="${profile_line#*$'\t'}"
+  preset_name="$existing_name"
+  preset_id="$existing_id"
+  profile_edited=0
+
+  if [ ! -f "$PROFILE_FILE_HOST" ] && [ -f "$LEGACY_CONFIG_HOST" ]; then
+    echo "[setup] Legacy Student Profile Detected: Please re-enter your credentials to access Synthesis commands"
+    profile_edited=1
+  fi
+
+  if [ -n "$existing_name" ] && [ -n "$existing_id" ]; then
+    print_student_profile_current_host
+    read -r -p "Change any cached student profile info? [y/N]: " change_profile
+    case "$change_profile" in
+      y|Y|yes|YES)
+        profile_edited=1
+        read -r -p "Enter your name (press Enter to keep '$existing_name'): " new_name
+        [ -n "$new_name" ] && preset_name="$new_name"
+        while :; do
+          read -r -p "Enter student ID (9 digits, Enter to keep '$existing_id'): " new_id
+          if [ -z "$new_id" ]; then
+            break
+          fi
+          if [[ "$new_id" =~ ^[0-9]{9}$ ]]; then
+            preset_id="$new_id"
+            break
+          fi
+          echo "Student ID must be exactly 9 numeric digits." >&2
+        done
+        ;;
+      *)
+        ;;
+    esac
+  else
+    profile_edited=1
+    [ -z "$preset_name" ] && preset_name="$(prompt_student_name)"
+    [ -z "$preset_id" ] && preset_id="$(prompt_student_id)"
+  fi
+
+  if [ -z "$preset_name" ]; then
+    preset_name="$(prompt_student_name)"
+  fi
+  if ! [[ "$preset_id" =~ ^[0-9]{9}$ ]]; then
+    preset_id="$(prompt_student_id)"
+  fi
+
+  if [ "$profile_edited" -eq 1 ]; then
+    while :; do
+      echo "[setup] Please confirm student profile:"
+      printf "  %-11s %s\n" "Name:" "$preset_name"
+      printf "  %-11s %s\n" "Student ID:" "$preset_id"
+      read -r -p "Proceed with this profile? [Y/n]: " profile_confirm
+      case "$profile_confirm" in
+        n|N|no|NO)
+          preset_name="$(prompt_student_name)"
+          preset_id="$(prompt_student_id)"
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+  fi
+
+  ensure_profile_writable "$PROFILE_FILE_HOST"
+  write_student_profile_host "$preset_name" "$preset_id"
+  if [ -f "$LEGACY_CONFIG_HOST" ] && [ ! -e "$LEGACY_CONFIG_HOST.bak" ]; then
+    mv -f "$LEGACY_CONFIG_HOST" "$LEGACY_CONFIG_HOST.bak" || true
+  fi
+  profile_line="$(get_student_profile_host)"
+  verify_name="${profile_line%%$'\t'*}"
+  verify_id="${profile_line#*$'\t'}"
+  if [ -z "$verify_name" ] || ! [[ "$verify_id" =~ ^[0-9]{9}$ ]]; then
+    echo "Error: setup requires both current name and 9-digit student ID in student_profile.env." >&2
+    exit 1
+  fi
+
+  echo "Recorded student profile:"
+  print_student_profile_current_host
+  if [ "$PROFILE_ONLY" -eq 1 ]; then
+    echo "[setup] Profile update complete."
+    exit 0
+  fi
+  echo "Building Docker image '$IMAGE_NAME'..."
+  if [ -n "$DOCKER_PLATFORM_FLAG" ]; then
+    if docker buildx version >/dev/null 2>&1; then
+      docker buildx build --platform linux/amd64 --load -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+    else
+      echo "Error: docker buildx not available; cannot build amd64 image." >&2
+      echo "Enable Buildx:" >&2
+      echo "  docker buildx create --use --name cs147-builder" >&2
+      echo "  docker buildx inspect --bootstrap" >&2
+      exit 1
+    fi
+  else
+    docker build -t "$IMAGE_NAME" -f "$REPO_ROOT/docker/Dockerfile" "$REPO_ROOT"
+  fi
+  echo "Docker image '$IMAGE_NAME' is ready."
+  if [ -f "$REPO_ROOT/assignments/tools/assembler/Assemble.java" ]; then
+    echo "Compiling assembler classes..."
+    docker run --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" -w /repo "$IMAGE_NAME" bash -lc "cd /repo/assignments/tools/assembler && javac Assemble.java AssemblyLine.java Assemble4096.java"
+  fi
+  echo "------------------------------------------------------------"
+  echo "[SELF-TEST] .testing"
+  echo "============================================================"
+  mkdir -p "$SELFTEST_LOG_DIR"
+  attempt=1
+  set +e  # allow retries even when commands fail inside the loop
+  while [ $attempt -le 3 ]; do
+    echo "---------------- attempt $attempt/3 ----------------"
+    log_file="$SELFTEST_LOG_DIR/.testing_selftest_attempt${attempt}.log"
+    if run_with_spinner "Self-test attempt $attempt" bash --noprofile --norc -c "docker run --rm $DOCKER_PLATFORM_FLAG -v \"$REPO_ROOT:/repo\" ${DOCKER_SOCK_VOLUME[*]} -w /repo \"$IMAGE_NAME\" bash -lc \"set -e; make submit .testing ${TEST_FORCE:+FORCE_RESULT=\\\"$TEST_FORCE\\\"}\" >\"$log_file\" 2>&1"; then
+      cat "$log_file"
+      echo "============================================================"
+      echo "[SELF-TEST] PASS"
+      echo "------------------------------------------------------------"
+      exit 0
+    else
+      if [ $attempt -lt 3 ]; then
+        echo "(attempt $attempt failed; output saved to $log_file)"
+      else
+        cat "$log_file"
+      fi
+    fi
+    echo "---------------- end attempt $attempt ----------------"
+    attempt=$((attempt+1))
+  done
+  set -e
+  echo "============================================================"
+  echo "[SELF-TEST] FAIL after 3 attempts. Please contact the instructor."
+  if ls "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log >/dev/null 2>&1; then
+    echo "Saved logs:"
+    ls -1 "$SELFTEST_LOG_DIR"/.testing_selftest_attempt*.log
+    zip_path="$SELFTEST_LOG_DIR/selftest_logs.zip"
+    if command -v zip >/dev/null 2>&1; then
+      rm -f "$zip_path"
+      (cd "$SELFTEST_LOG_DIR" && zip -q "selftest_logs.zip" .testing_selftest_attempt*.log >/dev/null 2>&1)
+      if [ -f "$zip_path" ]; then
+        echo "Log bundle: $zip_path"
+      fi
+    fi
+  fi
+  echo "------------------------------------------------------------"
+  exit 1
+fi
+
+if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+  echo "Error: Docker image '$IMAGE_NAME' not found. Run './run setup' first." >&2
+  exit 1
+fi
+
+if [ $# -eq 0 ]; then
+  set -- shell
+fi
+
+if [ "$1" = "shell" ]; then
+  shift
+  exec docker run --rm $DOCKER_PLATFORM_FLAG "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" bash "$@"
+fi
+
+exec docker run --rm $DOCKER_PLATFORM_FLAG "${TTY_FLAGS[@]}" -v "$REPO_ROOT:/repo" "${DOCKER_SOCK_VOLUME[@]}" -w "$WORKDIR" "$IMAGE_NAME" "$@"

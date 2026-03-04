@@ -1,0 +1,434 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Spring 26}
+\rhead{CS 147}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titlespacing*{\section}{0pt}{1.0\baselineskip}{0.5\baselineskip}
+\titlespacing*{\subsection}{0pt}{0.75\baselineskip}{0.25\baselineskip}
+\setlist[itemize]{topsep=0.25\baselineskip, itemsep=0.15\baselineskip, leftmargin=2.5em}
+
+
+% --- global spacing tuning (light touch) ---
+\linespread{1.05} % slightly more line height
+\setlength{\parskip}{0.35\baselineskip}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.18} % more vertical room in tables
+
+\begin{document}
+
+\begin{center}
+{\large \textbf{Computer Sciences Department}}\\
+{\large \textbf{San Jose State University}}\\[0.25\baselineskip]
+{\large \textbf{CS 147 -- Introduction to Computer Architecture}}\\[0.5\baselineskip]
+{\Large \textbf{Project Specifications}}
+\end{center}
+
+\section{Microarchitecture Specification}
+
+In this document, we describe the microarchitecture, including register file specifications, memory system organization, etc.\ you will use for your CS 147 project. The WISC-SJ26 architecture that you will design for the final project shares many resemblances to the MIPS R2000 described in the text. The major differences are a smaller instruction set and 16-bit words for the WISC-SJ26. Similarities include a load/store architecture and three fixed-length instruction formats.
+
+\subsection{Registers}
+There are eight user registers, R0--R7. Unlike the MIPS R2000, R0 is not always zero. Register R7 is used as the link register for JAL or JALR instructions. The program counter is separate from the user register file. If you choose to implement exceptions for extra credit, a special register named EPC is used to save the current PC upon an exception or interrupt invocation.
+
+\subsection{Memory System}
+The WISC-SJ26 is a Harvard architecture, meaning instructions and data are located in different physical memories. It is byte-addressable, word aligned (where a word is 16 bits long -- note that this is different from some of the examples in class), and big-endian. The final version of the WISC-SJ26 will include a multi-cycle memory and one level of cache. However, initial versions of the machine will contain a single cycle memory. See the project deadlines for more details.
+
+The WISC-SJ26 cache replacement policy is deterministic. See the cache module description for an outline of the algorithm you must use.
+
+\textbf{NOTE:} For Phase 1 and Phase 2, you will work with a simplified memory model which supports unaligned accesses.
+
+\subsection{Pipeline}
+The final version of the WISC-SJ26 contains a five-stage pipeline identical to the MIPS R2000. The stages are:
+\begin{enumerate}
+\item Instruction Fetch (IF)
+\item Instruction Decode / Register Fetch (ID)
+\item Execute / Address Calculation (EX)
+\item Memory Access (MEM)
+\item Write Back (WB)
+\end{enumerate}
+
+See Figure 4.33 on page 299, Figure 4.35 on page 301, or Figure 4.36 on page 303 of the text for good starting points.
+
+\subsection{Optimizations}
+Your goal in optimizations is to reduce the CPI of the processor or the total cycles taken to execute a program. While the primary concern of the WISC-SJ26 is correct functionality, the architecture must still have a reasonable clock period. Therefore, you may not have more than one of the following in series during any stage:
+\begin{itemize}
+\item register file
+\item memory or cache
+\item 16-bit full adder
+\item barrel shifter
+\end{itemize}
+
+You may implement any type of optimization to reduce the CPI (as long as it's a valid optimization). The required optimizations are:
+\begin{itemize}
+\item Register file bypassing
+\item There are two register forwarding paths in the WISC-SJ26:
+  \begin{itemize}
+  \item Forwarding from beginning of the MEM stage to beginning of EX stage (EX $\rightarrow$ EX forwarding)
+  \item Forwarding from beginning of the WB stage to the beginning of the EX stage (MEM $\rightarrow$ EX forwarding)
+  \end{itemize}
+\item All branches should be predicted not-taken. This means that the pipeline should continue to execute sequentially until the branch resolves, and then squash instructions after the branch if the branch was actually taken.
+\end{itemize}
+
+\subsection{Exceptions (extra credit)}
+\textbf{NOTE:} Exception-handling extra credit will not be graded or evaluated until Phase 3 of the project. However, students are encouraged to try to work exception support into their design earlier.
+
+Exception handling is extra credit. If you choose not to implement exception handling, an illegal instruction should be treated as a NOP. IllegalOp is the only defined exception in the WISC-SJ26 architecture. It is invoked when the opcode of the currently executing instruction is not a recognized member of the ISA. Upon finding an illegal opcode, the computer shall save the current PC into the reserved register EPC and then load address 0x02, which is the location of the IllegalOp exception handler. Note that if you choose to implement exceptions, address 0x00 must be a jump to the start of the main program.
+
+The exception handler itself need not be complex. At a minimum it should load the value 0xBADD into R7 and then use/call the RTI instruction to return to the address specified by the EPC.
+
+
+\clearpage
+\section{ISA Specification}
+
+\subsection{Instruction Summary}
+\noindent\textbf{KEY:} sss = rs, ddd = rd, ttt = rt, iii* = immediate.
+
+\setlength{\LTleft}{0pt}\setlength{\LTright}{0pt}
+\small
+\setlength{\tabcolsep}{1pt}
+\renewcommand{\arraystretch}{1.32}
+\begin{longtable}{|>{\ttfamily}p{0.65in}|>{\ttfamily}p{1.05in}|p{1.40in}|p{3.10in}|}
+\hline
+Encoding & Format & Syntax & Semantics \\
+\hline
+\hline
+\endfirsthead
+\hline
+Encoding & Format & Syntax & Semantics \\
+\hline
+\hline
+\endhead
+\hline
+\endfoot
+00000 & xxxxxxxxxxx & HALT & Cease instruction issue, dump memory state to file \\
+\hline
+00001 & xxxxxxxxxxx & NOP & None \\
+\hline
+01000 & sss ddd iiiii & ADDI Rd, Rs,\newline immediate & Rd <- Rs + I(sign ext.) \\
+\hline
+01001 & sss ddd iiiii & SUBI Rd, Rs,\newline immediate & Rd <- I(sign ext.) - Rs \\
+\hline
+01010 & sss ddd iiiii & XORI Rd, Rs,\newline immediate & Rd <- Rs XOR I(zero ext.) \\
+\hline
+01011 & sss ddd iiiii & ANDNI Rd, Rs,\newline immediate & Rd <- Rs AND \textasciitilde{}I(zero ext.) \\
+\hline
+10100 & sss ddd iiiii & ROLI Rd, Rs,\newline immediate & Rd <- Rs <<(rotate) I(lowest 4 bits) \\
+\hline
+10101 & sss ddd iiiii & SLLI Rd, Rs,\newline immediate & Rd <- Rs << I(lowest 4 bits) \\
+\hline
+10110 & sss ddd iiiii & RORI Rd, Rs,\newline immediate & Rd <- Rs >>(rotate) I(lowest 4 bits) \\
+\hline
+10111 & sss ddd iiiii & SRLI Rd, Rs,\newline immediate & Rd <- Rs >> I(lowest 4 bits) \\
+\hline
+10000 & sss ddd iiiii & ST Rd, Rs,\newline immediate & Mem[Rs + I(sign ext.)] <- Rd \\
+\hline
+10001 & sss ddd iiiii & LD Rd, Rs,\newline immediate & Rd <- Mem[Rs + I(sign ext.)] \\
+\hline
+10011 & sss ddd iiiii & STU Rd, Rs,\newline immediate & Mem[Rs + I(sign ext.)] <- Rd; Rs <- Rs + I(sign ext.) \\
+\hline
+11001 & sss xxx ddd xx & BTR Rd, Rs & Rd[bit i] <- Rs[bit 15-i] for i=0..15 \\
+\hline
+11011 & sss ttt ddd 00 & ADD Rd, Rs, Rt & Rd <- Rs + Rt \\
+\hline
+11011 & sss ttt ddd 01 & SUB Rd, Rs, Rt & Rd <- Rt - Rs \\
+\hline
+11011 & sss ttt ddd 10 & XOR Rd, Rs, Rt & Rd <- Rs XOR Rt \\
+\hline
+11011 & sss ttt ddd 11 & ANDN Rd, Rs, Rt & Rd <- Rs AND \textasciitilde{}Rt \\
+\hline
+11010 & sss ttt ddd 00 & ROL Rd, Rs, Rt & Rd <- Rs << (rotate) Rt (lowest 4 bits) \\
+\hline
+11010 & sss ttt ddd 01 & SLL Rd, Rs, Rt & Rd <- Rs << Rt (lowest 4 bits) \\
+\hline
+11010 & sss ttt ddd 10 & ROR Rd, Rs, Rt & Rd <- Rs >> (rotate) Rt (lowest 4 bits) \\
+\hline
+11010 & sss ttt ddd 11 & SRL Rd, Rs, Rt & Rd <- Rs >> Rt (lowest 4 bits) \\
+\hline
+11100 & sss ttt ddd xx & SEQ Rd, Rs, Rt & if (Rs == Rt) then Rd <- 1 else Rd <- 0 \\
+\hline
+11101 & sss ttt ddd xx & SLT Rd, Rs, Rt & if (Rs < Rt) then Rd <- 1 else Rd <- 0 \\
+\hline
+11110 & sss ttt ddd xx & SLE Rd, Rs, Rt & if (Rs <= Rt) then Rd <- 1 else Rd <- 0 \\
+\hline
+11111 & sss ttt ddd xx & SCO Rd, Rs, Rt & if (Rs + Rt) generates carry out,\newline then Rd <- 1 else Rd <- 0 \\
+\hline
+01100 & sss iiiiiiii & BEQZ Rs,\newline signed immediate & if (Rs == 0) then PC <- PC + 2 + I(sign ext.) \\
+\hline
+01101 & sss iiiiiiii & BNEZ Rs,\newline signed immediate & if (Rs != 0) then PC <- PC + 2 + I(sign ext.) \\
+\hline
+01110 & sss iiiiiiii & BLTZ Rs,\newline signed immediate & if (Rs < 0) then PC <- PC + 2 + I(sign ext.) \\
+\hline
+01111 & sss iiiiiiii & BGEZ Rs,\newline signed immediate & if (Rs >= 0) then PC <- PC + 2 + I(sign ext.) \\
+\hline
+11000 & sss iiiiiiii & LBI Rs,\newline signed immediate & Rs <- I(sign ext.) \\
+\hline
+10010 & sss iiiiiiii & SLBI Rs, unsigned immediate & Rs <- (Rs << 8) | I(zero ext.) \\
+\hline
+00100 & ddddddddddd & J displacement & PC <- PC + 2 + D(sign ext.) \\
+\hline
+00101 & sss iiiiiiii & JR Rs,\newline signed immediate & PC <- Rs + I(sign ext.) \\
+\hline
+00110 & ddddddddddd & JAL displacement & R7 <- PC + 2; PC <- PC + 2 + D(sign ext.) \\
+\hline
+00111 & sss iiiiiiii & JALR Rs,\newline signed immediate & R7 <- PC + 2; PC <- Rs + I(sign ext.) \\
+\hline
+00010 & siic Rs & SIIC Rs & produce IllegalOp exception.\newline Must provide one source register. \\
+\hline
+00011 & xxxxxxxxxxx & NOP / RTI & PC <- EPC \\
+\hline
+\end{longtable}
+\normalsize
+
+
+\subsection{Formats}
+WISC-SJ26 supports instructions in four different formats: J-format, 2 I-formats, and the R-format. These are described below.
+
+\subsubsection{J-format}
+The J-format is used for jump instructions that need a large displacement.
+
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+5 bits & 11 bits \\
+\hline
+\hline
+Op Code & Displacement \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Jump Instructions.} The Jump instruction loads the PC with the value found by adding the PC of the next instruction (PC+2, not PC+4 as in MIPS) to the sign-extended displacement. The Jump-And-Link instruction loads the PC with the same value and also saves the address of the next sequential instruction (i.e., PC+2) in the link register R7.
+
+The syntax of the jump instructions is:
+\begin{itemize}
+\item J displacement
+\item JAL displacement
+\end{itemize}
+
+\subsubsection{I-format}
+I-format instructions use either a destination register, a source register, and a 5-bit immediate value; or a destination register and an 8-bit immediate value. The two types of I-format instructions are described below.
+
+\paragraph{I-format 1}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+5 bits & 3 bits & 3 bits & 5 bits \\
+\hline
+\hline
+Op Code & Rs & Rd & Immediate \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+
+The I-format 1 instructions include XOR-Immediate, ANDN-Immediate, Add-Immediate, Subtract-Immediate, Rotate-Left-Immediate, Shift-Left-Logical-Immediate, Rotate-Right-Immediate, Shift-Right-Logical-Immediate, Load, Store, and Store with Update.
+
+The syntax of the I-format 1 instructions is:
+\begin{itemize}
+\item ADDI Rd, Rs, immediate
+\item SUBI Rd, Rs, immediate
+\item XORI Rd, Rs, immediate
+\item ANDNI Rd, Rs, immediate
+\item ROLI Rd, Rs, immediate
+\item SLLI Rd, Rs, immediate
+\item RORI Rd, Rs, immediate
+\item SRLI Rd, Rs, immediate
+\item ST Rd, Rs, immediate
+\item LD Rd, Rs, immediate
+\item STU Rd, Rs, immediate
+\end{itemize}
+
+\paragraph{I-format 2}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+5 bits & 3 bits & 8 bits \\
+\hline
+\hline
+Op Code & Rs & Immediate \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+
+The format of these instructions is:
+\begin{itemize}
+\item LBI Rs, signed immediate
+\item SLBI Rs, unsigned immediate
+\item JR Rs, immediate
+\item JALR Rs, immediate
+\item BEQZ Rs, signed immediate
+\item BNEZ Rs, signed immediate
+\item BLTZ Rs, signed immediate
+\item BGEZ Rs, signed immediate
+\end{itemize}
+
+\subsubsection{R-format}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+5 bits & 3 bits & 3 bits & 3 bits & 2 bits \\
+\hline
+\hline
+Op Code & Rs & Rt & Rd & Op Code Extension \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+
+The syntax of the R-format ALU and shift instructions is:
+\begin{itemize}
+\item ADD Rd, Rs, Rt
+\item SUB Rd, Rs, Rt
+\item XOR Rd, Rs, Rt
+\item ANDN Rd, Rs, Rt
+\item ROL Rd, Rs, Rt
+\item SLL Rd, Rs, Rt
+\item ROR Rd, Rs, Rt
+\item SRL Rd, Rs, Rt
+\item SEQ Rd, Rs, Rt
+\item SLT Rd, Rs, Rt
+\item SLE Rd, Rs, Rt
+\item SCO Rd, Rs, Rt
+\item BTR Rd, Rs
+\end{itemize}
+
+\subsection{Special Instructions}
+Special instructions use the R-format. The syntax of these instructions is:
+\begin{itemize}
+\item HALT
+\item NOP
+\end{itemize}
+
+The SIIC and RTI instructions are extra credit and can be deferred for later. They will not be tested until the final demo.
+
+
+\clearpage
+\section{Cache Module Specification}
+
+\subsection{Cache Interface}
+This figure shows the external interface to the module. Each signal is described in the table below.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.1}
+\setlength{\tabcolsep}{6pt}
+\begin{longtable}{|>{\ttfamily}p{1.0in}|p{0.6in}|p{0.5in}|p{3.4in}|}
+\hline
+Signal & In/Out & Width & Description \\
+\hline
+\hline
+\endfirsthead
+\hline
+Signal & In/Out & Width & Description \\
+\hline
+\hline
+\endhead
+\hline
+\endfoot
+enable & In & 1 & Enable cache. Active high. If low, "write" and "comp" have no effect, and all outputs are zero. \\
+\hline
+index & In & 8 & The address bits used to index into the cache memory. \\
+\hline
+offset & In & 3 & offset[2:1] selects which word to access in the cache line. The least significant bit should be 0 for word alignment. If the least significant bit is 1, it is an error condition. \\
+\hline
+comp & In & 1 & Compare. When comp=1, the cache will compare tag\_in to the tag of the selected line and indicate if a hit has occurred; the data portion of the cache is read or written but writes are suppressed if there is a miss. When comp=0, no compare is done and the Tag and Data portions of the cache will both be read or written. \\
+\hline
+write & In & 1 & Write signal. If high at the rising edge of the clock, a write is performed to the data selected by "index" and "offset", and (if comp=0) to the tag selected by "index". \\
+\hline
+tag\_in & In & 5 & When comp=1, this field is compared against stored tags to see if a hit occurred; when comp=0 and write=1 this field is written into the tag portion of the array. \\
+\hline
+data\_in & In & 16 & On a write, the data that is to be written to the location specified by the index and offset inputs. \\
+\hline
+valid\_in & In & 1 & On a write when comp=0, the data that is to be written to valid bit at the location specified by the index input. \\
+\hline
+clk & In & 1 & Clock signal; rising edge active. \\
+\hline
+rst & In & 1 & Reset signal. When rst=1 on the rising edge of the clock, all lines are marked invalid. (The rest of the cache state is not initialized and may contain X’s.) \\
+\hline
+createdump & In & 1 & Write contents of entire cache to memory file. Active on rising edge. \\
+\hline
+hit & Out & 1 & Goes high during a compare if the tag at the location specified by the index lines matches the tag\_in lines. \\
+\hline
+dirty & Out & 1 & When this bit is read, it indicates whether this cache line has been written to. It is valid on a read cycle, and also on a compare-write cycle when hit is false. On a write with comp=1, the cache sets the dirty bit to 1. On a write with comp=0, the dirty bit is reset to 0. \\
+\hline
+tag\_out & Out & 5 & When write=0, the tag selected by index appears on this output. (This value is needed during a writeback.) \\
+\hline
+data\_out & Out & 16 & When write=0, the data selected by index and offset appears on this output. \\
+\hline
+valid & Out & 1 & During a read, this output indicates the state of the valid bit in the selected cache line. \\
+\hline
+err & Out & 1 & Error output (used for invalid offset[0]). \\
+\hline
+\end{longtable}
+\end{center}
+
+\subsection{Instantiating Cache Modules}
+When instantiating the module, there is a parameter which should be set for each instance. When you dump the contents of the cache to a set of files (e.g.\ for debugging), this parameter allows each instance to go to a unique set of filenames.
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Parameter Value & File Names \\
+\hline
+\hline
+0 & Icache\_0\_data\_0, Icache\_0\_data\_1, Icache\_0\_tags, ... \\
+\hline
+1 & Dcache\_0\_data\_0, Dcache\_0\_data\_1, Dcache\_0\_tags, ... \\
+\hline
+2 & Icache\_1\_data\_0, Icache\_1\_data\_1, Icache\_1\_tags, ... \\
+\hline
+3 & Dcache\_1\_data\_0, Dcache\_1\_data\_1, Dcache\_1\_tags, ... \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Organization of the Cache}
+The cache contains 256 lines. Each line contains one valid bit, one dirty bit, a 5-bit tag, and four 16-bit words.
+
+\subsection{Cache Operation and Semantics (Direct-mapped Cache)}
+Although there are a lot of signals for the cache, its operation is pretty simple. When \texttt{enable} is high, the two main control lines are \texttt{comp} and \texttt{write}. Here are the four cases:
+\begin{enumerate}
+\item Compare Read (\texttt{comp}=1, \texttt{write}=0)
+\item Compare Write (\texttt{comp}=1, \texttt{write}=1)
+\item Access Read (\texttt{comp}=0, \texttt{write}=0)
+\item Access Write (\texttt{comp}=0, \texttt{write}=1)
+\end{enumerate}
+
+\subsection{Building a Two-way Set-associative Cache}
+After you have a working design using a direct-mapped cache, you will add a second cache module to make your design two-way set-associative.
+
+\subsection{Pseudo-random Replacement for Two-way Set-associative Cache}
+In order to make the designs more deterministic and easier to grade, all set-associative caches must implement the following replacement algorithm:
+\begin{enumerate}
+\item Have a flip-flop called \texttt{victimway} which is initialized to zero.
+\item On each read or write of the cache, invert the state of \texttt{victimway}.
+\item When installing a line after a cache miss, install in an invalid block if possible. If both ways are invalid, install in way zero.
+\item If both ways are valid, and a block must be victimized, use \texttt{victimway} (after already being inverted for this access) to indicate which way to use.
+\item For the D cache, do not invert \texttt{victimway} for instructions that do not read or write cache, or for invalid instructions, or for instructions that are squashed due to branch misprediction.
+\item For the I cache, invert \texttt{victimway} for each instruction fetched.
+\end{enumerate}
+
+
+\clearpage
+\section*{Note}
+This document is subject to change as new phases of the project become active. If an updated version is available, you can acquire it via \texttt{./run update}.
+
+\end{document}
