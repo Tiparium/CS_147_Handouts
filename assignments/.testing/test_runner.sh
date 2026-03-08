@@ -519,6 +519,9 @@ PY
     return
   fi
 
+  # Ensure per-phase output directory exists before writing summary artifacts.
+  mkdir -p "$out_root/$phase"
+
   if [ "$action" = "list" ]; then
     # Group by test categories instead of listing individual .asm files.
     simple_dir="inst_tests"
