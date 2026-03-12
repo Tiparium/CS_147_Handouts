@@ -79,6 +79,23 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     return out
 
 
+def recompute_expected_hashes(submission_root: Path, expected_paths: List[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for rel in sorted(expected_paths):
+        if rel == "submission_report.log":
+            continue
+        p = (submission_root / rel).resolve()
+        try:
+            if not p.exists() or p.is_dir():
+                out[rel] = "__MISSING__"
+                continue
+            with p.open("rb") as f:
+                out[rel] = hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            out[rel] = "__ERROR__"
+    return out
+
+
 def hash_report(title: str, mapping: Dict[str, str]) -> List[str]:
     rep: List[str] = []
     rep.append(f"================ {title} ================")
@@ -107,12 +124,22 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
 
     hash_status = "MISSING"
     if expected_hashes:
-        if expected_hashes != actual_hashes:
+        expected_files = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        expected_report = expected_hashes.get("submission_report.log")
+        actual_files = recompute_expected_hashes(submission_root, list(expected_files.keys()))
+
+        source_mismatch = expected_files != actual_files
+        report_mismatch = False
+        if expected_report is not None:
+            actual_report = _hash_report_body(submission_root / "submission_report.log")
+            report_mismatch = (actual_report != expected_report)
+
+        if source_mismatch:
             hash_status = "MISMATCH"
-            notes.append("Hash mismatch between report and submission files (scoring forced to 0).")
+            notes.append("Hash mismatch between expected and actual submission files (scoring forced to 0).")
             if VERBOSE or HASH_VERBOSE:
-                notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
-                notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
+                notes.extend(hash_report("HASH REPORT (expected source)", expected_files))
+                notes.extend(hash_report("HASH REPORT (actual source)", actual_files))
             notes.insert(0, f"Hash status: {hash_status}")
             tests.append({
                 "name": "project_phase_1",
@@ -121,7 +148,9 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
                 "output": "Hash mismatch detected.",
             })
             return 0.0, 0.0, 0.0, notes, tests
-        hash_status = "OK"
+        hash_status = "REPORT_MISMATCH" if report_mismatch else "OK"
+        if report_mismatch:
+            notes.append("submission_report.log hash mismatch detected (non-fatal).")
 
     summary_path = submission_root / "project_phase_1_grade_summary.json"
     if not summary_path.exists():
