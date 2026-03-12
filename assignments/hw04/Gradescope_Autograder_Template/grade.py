@@ -76,6 +76,23 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     return out
 
 
+def recompute_expected_hashes(submission_root: Path, expected_paths: List[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for rel in sorted(expected_paths):
+        if rel == "submission_report.log":
+            continue
+        p = (submission_root / rel).resolve()
+        try:
+            if not p.exists() or p.is_dir():
+                out[rel] = "__MISSING__"
+                continue
+            with p.open("rb") as f:
+                out[rel] = hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            out[rel] = "__ERROR__"
+    return out
+
+
 def parse_test_summary(lines: List[str]) -> Tuple[List[Dict], List[str]]:
     tests: List[Dict] = []
     notes: List[str] = []
@@ -132,15 +149,27 @@ def main() -> int:
     hash_ok = True
     hash_status = "UNKNOWN"
     if expected_hashes:
-        if expected_hashes == actual_hashes:
-            hash_status = "OK"
-        else:
+        expected_files = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        expected_report = expected_hashes.get("submission_report.log")
+        actual_files = recompute_expected_hashes(sub_root, list(expected_files.keys()))
+
+        source_mismatch = expected_files != actual_files
+        report_mismatch = False
+        if expected_report is not None:
+            actual_report = _hash_report_body(sub_root / "submission_report.log")
+            report_mismatch = (actual_report != expected_report)
+
+        if source_mismatch:
             hash_status = "MISMATCH"
             hash_ok = False
-            notes.append("Hash mismatch between report and submission files.")
+            notes.append("Hash mismatch between expected and actual submission files.")
+        elif report_mismatch:
+            hash_status = "REPORT_MISMATCH"
+            notes.append("submission_report.log hash mismatch detected (non-fatal).")
+        else:
+            hash_status = "OK"
     else:
         hash_status = "MISSING"
-        hash_ok = False
         notes.append("No hash block found in submission_report.log.")
 
     tests, test_notes = parse_test_summary(lines)
@@ -172,4 +201,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

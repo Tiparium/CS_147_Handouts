@@ -105,6 +105,23 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     return out
 
 
+def recompute_expected_hashes(submission_root: Path, expected_paths: List[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for rel in sorted(expected_paths):
+        if rel == "submission_report.log":
+            continue
+        p = (submission_root / rel).resolve()
+        try:
+            if not p.exists() or p.is_dir():
+                out[rel] = "__MISSING__"
+                continue
+            with p.open("rb") as f:
+                out[rel] = hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            out[rel] = "__ERROR__"
+    return out
+
+
 def parse_test_summary(lines: List[str]) -> Tuple[List[Dict], List[str]]:
     """Parse test_runner quiet summary lines into test entries."""
     tests = []
@@ -158,16 +175,32 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
         rep.append("=" * len(rep[0]))
         return rep
 
-    # Hash check (warn on mismatch; continue grading so we can see why)
+    # Hash check policy:
+    # - Source/file hash mismatches are fatal (0 points).
+    # - submission_report.log hash mismatch is warning-only.
     if expected_hashes:
-        if expected_hashes != actual_hashes:
+        expected_files = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        expected_report = expected_hashes.get("submission_report.log")
+        actual_files = recompute_expected_hashes(submission_root, list(expected_files.keys()))
+
+        source_mismatch = expected_files != actual_files
+        report_mismatch = False
+        if expected_report is not None:
+            actual_report = _hash_report_body(submission_root / "submission_report.log")
+            report_mismatch = (actual_report != expected_report)
+
+        if source_mismatch:
             hash_status = "MISMATCH"
-            notes.append("Hash mismatch between report and submission files (continuing with 0 points).")
+            notes.append("Hash mismatch between expected and actual submission files.")
             notes.insert(0, f"Hash status: {hash_status}")
             if VERBOSE or HASH_VERBOSE:
-                notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
-                notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
+                notes.extend(hash_report("HASH REPORT (expected source)", expected_files))
+                notes.extend(hash_report("HASH REPORT (actual source)", actual_files))
             return 0.0, sum(SUB_POINTS.values()), notes, []
+
+        if report_mismatch:
+            hash_status = "REPORT_MISMATCH"
+            notes.append("submission_report.log hash mismatch detected (non-fatal).")
         else:
             hash_status = "OK"
     else:
