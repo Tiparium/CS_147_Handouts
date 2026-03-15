@@ -1,11 +1,239 @@
-\documentclass{article}
+\documentclass[12pt]{article}
 \usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{xurl}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  urlcolor=blue,
+  linkcolor=blue,
+  citecolor=blue
+}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+\setlength{\emergencystretch}{4em}
+\sloppy
 
 \begin{document}
-\thispagestyle{empty}
 \begin{center}
-\vspace*{\fill}
-{\Huge\bfseries To Be Implemented}
-\vspace*{\fill}
+{\LARGE San Jose State University}\\[0.5em]
+{\LARGE CS 147 - Computer Architecture}\\[0.5em]
+{\LARGE Class Project - Phase 3}
 \end{center}
+
+\vspace{2em}
+
+\subsection*{Overall Timeline and Grade Distribution}
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Due Date} & \multicolumn{2}{l|}{\textbf{Project Component}} \\
+\hline
+2/26/26 & Design Review & (5\% of project grade) \\
+\hline
+3/10/26 & Phase \#1 & (15\% of project grade) \\
+\hline
+4/7/26 & Phase \#2 & (30\% of project grade) \\
+\hline
+4/16/26 & Phase \#2.1 & (10\% of project grade) \\
+\hline
+N/A & Phase \#2.2 & (Optional) \\
+\hline
+4/23/26 & Phase \#2.3 Caching & (10\% of project grade) \\
+\hline
+\rowcolor{black!8}
+5/7/26 & Phase \#3 & (30\% of project grade) \\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{Phase \#3 --- Final Processor Integration (30\% of project grade)}
+
+\subsection*{Overview}
+
+Phase 3 is the final stage of the processor project. In this phase you will integrate your
+fully pipelined processor with a realistic memory system and implement several required
+performance optimizations.
+
+By this point, your design should already include:
+
+\begin{itemize}
+\item A working five-stage pipelined processor
+\item A functioning cache system
+\item Correct handling of pipeline hazards
+\end{itemize}
+
+Phase 3 focuses on integrating the full memory hierarchy and implementing the
+forwarding and prediction mechanisms needed for efficient execution.
+
+\subsection*{Required Features}
+
+Your final processor must implement the following functionality:
+
+\begin{itemize}
+\item Two-way set-associative caches backed by multi-cycle memory
+\item Register file bypassing
+\item Forwarding from the beginning of the MEM stage to the beginning of the EX stage
+\item Forwarding from the beginning of the WB stage to the beginning of the EX stage
+\item Static branch prediction (predict not taken)
+\end{itemize}
+
+When implementing forwarding, ensure that your design does not create a combinational
+path that effectively performs the work of multiple pipeline stages in a single cycle.
+Violating the intended pipeline structure may result in loss of credit.
+
+The IPC of your processor will also account for a small portion of this demo grade, so you
+should attempt to eliminate unnecessary stall cycles where possible.
+
+\subsection*{Assembling / Simulating}
+
+For the WISC-SJ26 ISA specification, refer to:
+
+\begin{quote}
+\texttt{./assignments/project/common/writeup/wisc-sj26\_spec.pdf}
+\end{quote}
+
+An assembler for the WISC-SJ26 ISA is provided for your use. Sample test
+programs are also provided, although you are strongly encouraged to write custom
+tests to augment these. Be aware that some provided test programs were written
+for a slightly different ISA specification and therefore may not work exactly as
+advertised. If unexpected behavior occurs, you must determine whether the issue
+is in your design or in the assumptions made by the test itself.
+
+The expected workflow for debugging WISC-SJ26 assembly tests is:
+
+\begin{enumerate}
+\item Write a test in WISC-SJ26 assembly language.
+\item Assemble it using:
+\begin{verbatim}
+./run assemble <program>.asm <program>
+\end{verbatim}
+\item Simulate the generated image using:
+\begin{verbatim}
+./run simulate <program>_all.img
+\end{verbatim}
+\item Examine the simulator trace to confirm that each instruction and register
+update matches your expectations.
+\end{enumerate}
+
+The simulator prints an instruction-by-instruction execution trace, which should
+be used to confirm that your program is doing exactly what you intended before
+you rely on it as evidence that the hardware is correct.
+
+\subsection*{Cache Files To Carry Forward}
+
+Your final cache implementation work for this project path should live in:
+\begin{quote}
+\texttt{./demo2/verilog/phase2\_3/cache\_assoc/}
+\end{quote}
+
+For Phase 3, the carried-forward cache should be the \textbf{two-way set-associative}
+version that serves as the final cache design target.
+
+The carried-forward cache files should include:
+
+\begin{center}
+\begin{tabular}{|l|p{10cm}|}
+\hline
+\textbf{File} & \textbf{Description} \\
+\hline
+cache.v & Cache storage structures (data, tag, valid, dirty) \\
+clkrst.v & Clock and reset module \\
+final\_memory.v & Memory bank implementation \\
+four\_bank\_mem.v & Four-banked memory wrapper \\
+mem.addr & Example address trace file \\
+memc.v & Data storage module used by cache \\
+memv.v & Valid-bit storage module used by cache \\
+mem\_system\_hier.v & Top-level wrapper used for testing \\
+mem\_system\_perfbench.v & Trace-based testbench \\
+mem\_system\_randbench.v & Random testbench \\
+mem\_system\_ref.v & Reference implementation used by testbench \\
+mem\_system.v & Memory system module \textbf{(this is the file you modify)} \\
+*.syn.v & Synthesizable memory modules \\
+\hline
+\end{tabular}
+\end{center}
+
+Place the carried-forward cache implementation in:
+\begin{quote}
+\texttt{./}\textbf{\texttt{demo3}}\texttt{/verilog/phase2\_3/cache\_assoc/}
+\end{quote}
+
+Only the associative/final implementation should be copied forward for Phase 3.
+
+\textbf{Your cache controller state diagram should also be carried forward.}
+
+\subsection*{Required student\_custom tests}
+
+Place your custom assembly tests in:
+
+\begin{quote}
+\texttt{./assignments/project/testprograms/student\_custom/}
+\end{quote}
+
+and add them to:
+
+\begin{quote}
+\texttt{./assignments/project/testprograms/student\_custom/all\_phase\_3.list}
+\end{quote}
+
+At least two custom tests are required.
+Writing more tests is strongly encouraged.
+
+\subsection*{Submission Contents}
+
+\paragraph{verilog/}
+
+This directory should contain all Verilog and Vcheck files needed to compile and run
+your processor. Your processor should be able to compile and run using only the files
+present in this directory.
+
+The Phase 3 testing and submission flow is intended to match the rest of the
+course workflow: you should run the project test command, then generate your
+submission using the standard submission wrapper. Any result collection and
+packaging details should be handled automatically by the submission process.
+
+Running the full verification suite may take approximately 40 minutes, so plan accordingly.
+
+\subsection*{Grading and Demonstration}
+
+Submissions will ultimately be graded automatically using the course verification flow for Phase 3.
+
+If failures are detected, students may be asked to meet with the course staff to discuss
+partial credit and debugging.
+
+If your processor has known failures, you should bring a short written explanation of
+the causes of those failures. Demonstrating an understanding of the problem will help
+maximize the credit you receive.
+
+If the complete processor is not functional, you may demonstrate partially working
+subsystems such as:
+
+\begin{itemize}
+\item Stalling instruction memory alone
+\item Stalling data memory alone
+\item Stalling instruction and data memory together
+\item Direct-mapped instruction cache
+\item Direct-mapped data cache
+\item Two-way instruction cache
+\item Two-way data cache
+\end{itemize}
+
+During any demonstration, you should be prepared to explain the behavior of the processor design.
+
+\subsection*{Testing}
+
+Use:
+\begin{quote}
+\texttt{./run test project phase\_3}
+\end{quote}
+
+\subsection*{Submitting}
+
+Use:
+\begin{quote}
+\texttt{./run build\_submission project phase\_3}
+\end{quote}
+
 \end{document}
