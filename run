@@ -1033,10 +1033,12 @@ case "${1:-}" in
     marker_path="$REPO_ROOT/assignments/$assignment_arg/.last_submit_zip"
     if [ ! -f "$marker_path" ]; then
       echo "[submit] marker file not found for host autograder: $marker_path" >&2
-      exit 1
+      echo "[submit] host autograder skipped." >&2
+      exit 0
     fi
     rel_entry=$(cat "$marker_path")
     zip_name="${rel_entry##*/}"
+    zip_path_host="$REPO_ROOT/$rel_entry"
     if [ "$assignment_arg" = "project" ]; then
       case "$project_phase_arg" in
         phase_1) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
@@ -1049,8 +1051,15 @@ case "${1:-}" in
     fi
     if [ ! -d "$grader_dir" ]; then
       echo "[submit] Gradescope_Autograder_Template not found for $assignment_arg; skipping host autograder." >&2
-      exit 1
+      exit 0
     fi
+    if [ ! -f "$zip_path_host" ]; then
+      echo "[submit] submission zip not found for host autograder: $zip_path_host" >&2
+      echo "[submit] host autograder skipped." >&2
+      exit 0
+    fi
+    mkdir -p "$grader_dir/test_submissions"
+    cp "$zip_path_host" "$grader_dir/test_submissions/$zip_name"
     echo "[submit] running host autograder..."
     (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "test_submissions/$zip_name")
     grade_rc=$?

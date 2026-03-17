@@ -72,9 +72,9 @@ submit:
 	  echo "[submit] creating submission archive: $${name}"; \
 	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
 	fi; \
+	echo "$${zip_path#$(REPO_ROOT)/}" > "$${marker}"; \
 	if [ -d "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions" ]; then \
 	  cp "$${zip_path}" "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions/$${name}"; \
-	  echo "$(ASSIGNMENT_NAME) Gradescope_Autograder_Template/test_submissions/$${name}" > "$${marker}"; \
 	  echo "[submit] grader copy ready at Gradescope_Autograder_Template/test_submissions/$${name}"; \
 	else \
 	  echo "[submit] Gradescope_Autograder_Template/test_submissions not found; skipping grader copy."; \
