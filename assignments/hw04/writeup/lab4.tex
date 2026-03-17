@@ -40,11 +40,9 @@ The work flow we will follow is:
 \begin{enumerate}
 \item Write test in WISC-SJ26 assembly language.
 \item Assemble using:
-\textit{(This is one command broken into multiple lines.)}
-\begin{verbatim}
-./run assemble assignments/hw04/<subproblem>/<test_name>.asm \
-  assignments/hw04/<subproblem>/<test_name>
-\end{verbatim}
+\begin{lstlisting}[basicstyle=\ttfamily\small,breaklines=true]
+./run assemble assignments/hw04/<subproblem>/<test_name>.asm assignments/hw04/<subproblem>/<test_name> > assignments/hw04/<subproblem>/<test_name>_all.img
+\end{lstlisting}
 \item Simulate the test in the simulator and make sure your test is doing what you thought it was doing.
 Use the simulator via:
 \begin{verbatim}
@@ -59,8 +57,8 @@ Use the simulator via:
 \end{enumerate}
 
 Here is a short demo:
-\begin{verbatim}
-prompt% ./run assemble assignments/hw04/hw4_1/add_0.asm assignments/hw04/hw4_1/add_0
+\begin{lstlisting}[basicstyle=\ttfamily\small,breaklines=true]
+prompt% ./run assemble assignments/hw04/hw4_1/add_0.asm assignments/hw04/hw4_1/add_0 > assignments/hw04/hw4_1/add_0_all.img
 Created the following files
 add_0_0.img add_0_1.img add_0_2.img add_0_3.img
 add_0_all.img add_0.lst
@@ -85,7 +83,7 @@ Program Finished
 
 prompt%
 
-\end{verbatim}
+\end{lstlisting}
 
 The simulator will print a trace of each instruction along with the state of the relevant registers. You should
 examine these to make sure that your test is indeed doing what is expected.
