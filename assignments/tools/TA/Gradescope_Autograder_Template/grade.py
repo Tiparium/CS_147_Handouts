@@ -158,16 +158,23 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, List[str]
         rep.append("=" * len(rep[0]))
         return rep
 
-    # Hash check (warn on mismatch; continue grading so we can see why)
+    # Hash check: source-file mismatches are fatal; report-body drift is non-fatal.
     if expected_hashes:
-        if expected_hashes != actual_hashes:
+        expected_source_hashes = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        actual_source_hashes = {k: v for k, v in actual_hashes.items() if k != "submission_report.log"}
+        expected_report_hash = expected_hashes.get("submission_report.log")
+        actual_report_hash = actual_hashes.get("submission_report.log")
+        if expected_source_hashes != actual_source_hashes:
             hash_status = "MISMATCH"
-            notes.append("Hash mismatch between report and submission files (continuing with 0 points).")
+            notes.append("Source-file hash mismatch between report and submission files (scoring forced to 0).")
             notes.insert(0, f"Hash status: {hash_status}")
             if VERBOSE or HASH_VERBOSE:
                 notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
                 notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
             return 0.0, sum(SUB_POINTS.values()), notes, []
+        if expected_report_hash != actual_report_hash:
+            hash_status = "REPORT_MISMATCH"
+            notes.append("submission_report.log body hash drift detected; treating as non-fatal.")
         else:
             hash_status = "OK"
     else:

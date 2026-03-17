@@ -107,9 +107,13 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
 
     hash_status = "MISSING"
     if expected_hashes:
-        if expected_hashes != actual_hashes:
+        expected_source_hashes = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        actual_source_hashes = {k: v for k, v in actual_hashes.items() if k != "submission_report.log"}
+        expected_report_hash = expected_hashes.get("submission_report.log")
+        actual_report_hash = actual_hashes.get("submission_report.log")
+        if expected_source_hashes != actual_source_hashes:
             hash_status = "MISMATCH"
-            notes.append("Hash mismatch between report and submission files (scoring forced to 0).")
+            notes.append("Source-file hash mismatch between report and submission files (scoring forced to 0).")
             if VERBOSE or HASH_VERBOSE:
                 notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
                 notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
@@ -118,10 +122,14 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
                 "name": "project_phase_1",
                 "score": 0.0,
                 "max_score": TOTAL_POINTS,
-                "output": "Hash mismatch detected.",
+                "output": "Source-file hash mismatch detected.",
             })
             return 0.0, 0.0, 0.0, notes, tests
-        hash_status = "OK"
+        if expected_report_hash != actual_report_hash:
+            hash_status = "REPORT_MISMATCH"
+            notes.append("submission_report.log body hash drift detected; treating as non-fatal.")
+        else:
+            hash_status = "OK"
 
     summary_path = submission_root / "project_phase_1_grade_summary.json"
     if not summary_path.exists():

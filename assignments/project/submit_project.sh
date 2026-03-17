@@ -193,11 +193,11 @@ rm -rf "$stage_dir"
 
 if [ -d "$ASSIGNMENT_DIR/demo1/Gradescope_Autograder_Template/test_submissions" ]; then
   cp "$zip_path" "$ASSIGNMENT_DIR/demo1/Gradescope_Autograder_Template/test_submissions/$name"
-  echo "project demo1/Gradescope_Autograder_Template/test_submissions/$name" > "$MARKER"
   echo "[submit] grader copy ready at demo1/Gradescope_Autograder_Template/test_submissions/$name"
 else
   echo "[submit] demo1/Gradescope_Autograder_Template/test_submissions not found; skipping grader copy." >&2
 fi
+echo "${zip_path#$REPO_ROOT/}" > "$MARKER"
 
 if [ "$JUSTGRADE" = "1" ]; then
   rm -f "$zip_path"
