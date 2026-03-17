@@ -1061,7 +1061,7 @@ case "${1:-}" in
     mkdir -p "$grader_dir/test_submissions"
     cp "$zip_path_host" "$grader_dir/test_submissions/$zip_name"
     echo "[submit] running host autograder..."
-    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "test_submissions/$zip_name")
+    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" bash ./run grade "test_submissions/$zip_name")
     grade_rc=$?
     turnin_subdir="$assignment_arg"
     if [ "$assignment_arg" = "project" ]; then
