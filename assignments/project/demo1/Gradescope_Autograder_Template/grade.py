@@ -19,6 +19,7 @@ CONFIG = {
 TOTAL_POINTS = float(os.environ.get("TOTAL_POINTS", CONFIG.get("total_points", 100.0)))
 C_L = float(CONFIG.get("clamp_low", 0.0))
 C_H = float(CONFIG.get("clamp_high", 100.0))
+EXTRA_CREDIT_TESTS = {"siic_0", "rti_0"}
 
 
 def clamp(value: float, low: float = C_L, high: float = C_H) -> float:
@@ -156,24 +157,30 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
         })
         return 0.0, 0.0, 0.0, notes, tests
 
-    supplied = summary.get("supplied", {})
     student = summary.get("student_custom", {})
-    supplied_total = int(supplied.get("tests", 0))
-    supplied_pass = int(supplied.get("passed", 0))
-    supplied_fail = int(supplied.get("failed", max(0, supplied_total - supplied_pass)))
     student_total = int(student.get("tests", 0))
     student_pass = int(student.get("passed", 0))
     student_fail = int(student.get("failed", max(0, student_total - student_pass)))
 
+    supplied_total = 0
+    supplied_pass = 0
     group_totals: Dict[str, int] = {}
     group_passes: Dict[str, int] = {}
+    excluded_extra_credit: List[str] = []
     for t in summary.get("tests", []):
         if str(t.get("category", "")) != "supplied":
             continue
+        name = str(t.get("test", "")).strip()
+        if name in EXTRA_CREDIT_TESTS:
+            excluded_extra_credit.append(name)
+            continue
+        supplied_total += 1
         group = normalize_group(str(t.get("group", "unknown")))
         group_totals[group] = group_totals.get(group, 0) + 1
         if str(t.get("status", "")).upper() == "PASS":
+            supplied_pass += 1
             group_passes[group] = group_passes.get(group, 0) + 1
+    supplied_fail = max(0, supplied_total - supplied_pass)
 
     base_points = float(supplied_pass)
     bonus_points = 0.0
@@ -192,6 +199,8 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
     notes.append(f"Scoring policy: supplied tests only")
     notes.append(f"Supplied tests: {supplied_total} total, {supplied_pass} passed, {supplied_fail} failed")
     notes.append(f"Student tests: {student_total} total, {student_pass} passed, {student_fail} failed (not scored)")
+    if excluded_extra_credit:
+        notes.append(f"Excluded extra-credit supplied tests: {', ' .join(sorted(set(excluded_extra_credit)))}")
     notes.append(f"Base points (1 per supplied pass): {base_points:.2f}")
     notes.append(f"Bonus points (+10% per perfect supplied group): {bonus_points:.2f}")
     notes.append(f"Perfect supplied groups: {', '.join(perfect_groups) if perfect_groups else '(none)'}")
