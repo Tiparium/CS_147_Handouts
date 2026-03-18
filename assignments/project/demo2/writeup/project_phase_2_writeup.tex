@@ -4,6 +4,7 @@
 \usepackage{xurl}
 \usepackage[table]{xcolor}
 \usepackage{hyperref}
+\usepackage{graphicx}
 \hypersetup{
   colorlinks=true,
   urlcolor=blue,
@@ -194,6 +195,25 @@ The Verilog source is provided at:
 \end{quote}
 
 Since your single-cycle design must fetch instructions as well as read or write data in the same cycle, you will want to use two instances of this memory --- one for data, and one for instructions.
+
+\begin{center}
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{memory-info.png}
+\end{figure}
+\end{center}
+
+During each cycle, the ``enable" and ``wr" inputs determine what function the memory
+will perform. On an unaligned access err is set.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|} \hline
+enable & wr & Function & data\_out & err \\ \hline
+0 & X & No operation & 0 & 0 \\ \hline
+1 &.0 & Read & M[addr] & 0 \\ \hline
+1 & 1 & Write & Write data\_in & 0 \\ \hline
+1 & X & X & if (addr[0]) set & 1 \\ \hline
+\end{tabular}
+\end{center}
 
 \section*{Phase \#2.2 --- Pipelined Design with Stalling Memory (Optional)}
 \textbf{No submission required. This is optional.}
