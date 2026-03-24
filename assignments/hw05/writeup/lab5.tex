@@ -1,0 +1,123 @@
+\documentclass[12pt]{article}
+\usepackage{fullpage}
+\usepackage{enumitem}
+\usepackage{listings,amssymb}
+\usepackage{listings}
+\usepackage{graphicx,xcolor}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+
+\lstset{numbers=left, numberstyle=\tiny}
+% TODO: Reconfirm HW5 assignment point total before publication.
+% Current split assumes the present 70-point Gradescope placeholder (35/35).
+
+\title{CS 147: Lab 05 \\ Due Date: April 16, 2026}
+\author{}
+\date{}
+
+\begin{document}
+\frenchspacing
+\maketitle
+
+\section*{Homework: Cache Controller Design}
+
+\subsection*{Assignment Overview}
+
+The goal of this assignment is to develop:
+
+\begin{itemize}
+\item A schematic of the memory system
+\item A state machine diagram for the cache controller
+\end{itemize}
+
+These designs correspond to the cache system that will be implemented later in the project.
+
+Before beginning implementation, you should determine how your cache is arranged and how it functions.
+Drawing the state machine for your cache controller will help ensure that the controller logic behaves correctly.
+
+You may implement either a \textbf{Mealy} or \textbf{Moore} state machine, although a Moore machine is recommended since it is generally easier to reason about for this type of controller.
+
+Be aware that the resulting state machine may be fairly large, so starting early is recommended.
+
+\subsection*{Problem 1: Direct-Mapped Cache (35 points)}
+
+Create the schematic and state machine diagram for the \textbf{direct-mapped cache} that will be used in the next phase of the project.
+
+\paragraph{Memory System Schematic}
+
+Your schematic should show how the following components connect together:
+
+\begin{itemize}
+\item Direct-mapped cache
+\item Cache controller
+\item Four-bank memory module
+\end{itemize}
+
+These are the same modules that will later be connected together inside the memory system module used in the project.
+
+\paragraph{Cache Controller State Machine}
+
+Create a state machine diagram for the cache controller.
+The diagram should show:
+
+\begin{itemize}
+\item The states required to correctly operate the cache
+\item The transitions between those states
+\item The conditions that trigger each transition
+\end{itemize}
+
+\subsection*{Problem 2: Two-Way Set Associative Cache (35 points)}
+
+Next, modify your design to support a \textbf{two-way set associative cache}.
+
+Create the following:
+
+\begin{itemize}
+\item A schematic of the memory system showing the two-way set associative cache, cache controller, and four-bank memory module
+\item A state machine diagram for the cache controller
+\end{itemize}
+
+If your state machine from Problem 1 does not require changes, you may submit the same state machine diagram for both problems.
+
+\section*{Files to Submit}
+
+Place the following files in the assignment directories:
+
+\begin{verbatim}
+assignments/hw05/
+  hw5_1/
+    schematic.pdf
+    cacheFSM.pdf
+
+  hw5_2/
+    schematic.pdf
+    cacheFSM.pdf
+\end{verbatim}
+
+\begin{itemize}
+\item \texttt{hw5\_1/} should contain the files for Problem 1
+\item \texttt{hw5\_2/} should contain the files for Problem 2
+\item If the same file is used for both problems, place a copy in each directory
+\end{itemize}
+
+Digitally created diagrams are strongly preferred.
+Hand-drawn diagrams will be accepted only if they are very neat and clearly legible.
+If the schematic or the FSM diagram is missing, that component of the problem will receive zero points.
+
+\section*{Submission Instructions}
+
+To build a submission for grading, run:
+
+\begin{verbatim}
+./run build_submission hw05
+\end{verbatim}
+
+This will package the expected files into a submission zip and place it in:
+
+\begin{verbatim}
+generated_turnins/hw05/
+\end{verbatim}
+
+Upload the generated zip file to the corresponding Gradescope assignment.
+
+\end{document}
