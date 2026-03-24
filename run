@@ -1036,7 +1036,6 @@ case "${1:-}" in
       exit 1
     fi
     rel_entry=$(cat "$marker_path")
-    zip_name="${rel_entry##*/}"
     if [ "$assignment_arg" = "project" ]; then
       case "$project_phase_arg" in
         phase_1) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
@@ -1051,8 +1050,27 @@ case "${1:-}" in
       echo "[submit] Gradescope_Autograder_Template not found for $assignment_arg; skipping host autograder." >&2
       exit 1
     fi
+    submission_path=""
+    if [ -n "$rel_entry" ] && [ -f "$REPO_ROOT/$rel_entry" ]; then
+      submission_path="$REPO_ROOT/$rel_entry"
+    else
+      zip_name="${rel_entry##*/}"
+      if [ "$assignment_arg" = "project" ]; then
+        legacy_rel="assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name"
+      else
+        legacy_rel="assignments/$assignment_arg/Gradescope_Autograder_Template/test_submissions/$zip_name"
+      fi
+      if [ -f "$REPO_ROOT/$legacy_rel" ]; then
+        submission_path="$REPO_ROOT/$legacy_rel"
+        rel_entry="$legacy_rel"
+      else
+        echo "[submit] submission zip not found from marker: $rel_entry" >&2
+        exit 1
+      fi
+    fi
+    zip_name="${submission_path##*/}"
     echo "[submit] running host autograder..."
-    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "test_submissions/$zip_name")
+    (cd "$grader_dir" && AG_VERBOSE="$submit_verbose" AG_HASH_VERBOSE="$submit_hash_verbose" ./run grade "$submission_path")
     grade_rc=$?
     turnin_subdir="$assignment_arg"
     if [ "$assignment_arg" = "project" ]; then
@@ -1067,15 +1085,14 @@ case "${1:-}" in
     else
       echo "-------------------------------"
       echo "[submit] submission zip ready:"
-      if [ "$assignment_arg" = "project" ]; then
-        echo "  assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name"
-      else
-        echo "  assignments/$assignment_arg/Gradescope_Autograder_Template/test_submissions/$zip_name"
-      fi
+      echo "  $rel_entry"
       echo "-------------------------------"
     fi
     echo "[submit] cleaning autograder artifacts..."
     (cd "$grader_dir" && make clean >/dev/null 2>&1 || true)
+    if [ "$justgrade" = "1" ] && [ -f "$submission_path" ]; then
+      rm -f "$submission_path"
+    fi
     exit $grade_rc
     ;;
   clean)
