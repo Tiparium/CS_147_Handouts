@@ -164,6 +164,7 @@ rm -f "$ASSIGNMENT_DIR/hashes.tmp"
 
 zip_path=""
 name=""
+marker_rel=""
 if [ "$JUSTGRADE" = "1" ]; then
   zip_path="$ASSIGNMENT_DIR/grade_tmp_submission.zip"
   name="${zip_path##*/}"
@@ -191,16 +192,16 @@ cp "$SUMMARY_JSON" "$stage_dir/project_phase_1_grade_summary.json"
 (cd "$stage_dir" && zip -rq "$zip_path" .)
 rm -rf "$stage_dir"
 
+marker_rel="${zip_path#$REPO_ROOT/}"
+echo "$marker_rel" > "$MARKER"
 if [ -d "$ASSIGNMENT_DIR/demo1/Gradescope_Autograder_Template/test_submissions" ]; then
-  cp "$zip_path" "$ASSIGNMENT_DIR/demo1/Gradescope_Autograder_Template/test_submissions/$name"
-  echo "[submit] grader copy ready at demo1/Gradescope_Autograder_Template/test_submissions/$name"
+  if cp "$zip_path" "$ASSIGNMENT_DIR/demo1/Gradescope_Autograder_Template/test_submissions/$name"; then
+    echo "[submit] grader copy ready at demo1/Gradescope_Autograder_Template/test_submissions/$name"
+  else
+    echo "[submit] warning: could not copy zip into demo1/Gradescope_Autograder_Template/test_submissions; using $marker_rel instead."
+  fi
 else
   echo "[submit] demo1/Gradescope_Autograder_Template/test_submissions not found; skipping grader copy." >&2
-fi
-echo "${zip_path#$REPO_ROOT/}" > "$MARKER"
-
-if [ "$JUSTGRADE" = "1" ]; then
-  rm -f "$zip_path"
 fi
 
 rm -f "$REPORT_LOG" "$REPORT_VERBOSE" "$SUMMARY_JSON"

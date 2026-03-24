@@ -58,7 +58,7 @@ submit:
 	@cat "$(ASSIGNMENT_DIR)/hashes.tmp" "$(ASSIGNMENT_DIR)/submission_report.log" >"$(ASSIGNMENT_DIR)/submission_report.log.tmp"
 	@mv "$(ASSIGNMENT_DIR)/submission_report.log.tmp" "$(ASSIGNMENT_DIR)/submission_report.log"
 	@rm -f "$(ASSIGNMENT_DIR)/hashes.tmp"
-	@zip_path="" ; name="" ; marker="$(LAST_ZIP_MARKER)"; \
+	@zip_path="" ; name="" ; marker="$(LAST_ZIP_MARKER)"; marker_rel=""; \
 	if [ "${JUSTGRADE}" = "1" ]; then \
 	  zip_path="$(ASSIGNMENT_DIR)/grade_tmp_submission.zip"; \
 	  name="$${zip_path##*/}"; \
@@ -72,13 +72,16 @@ submit:
 	  echo "[submit] creating submission archive: $${name}"; \
 	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
 	fi; \
-	echo "$${zip_path#$(REPO_ROOT)/}" > "$${marker}"; \
+	marker_rel="$${zip_path#$(REPO_ROOT)/}"; \
+	echo "$${marker_rel}" > "$${marker}"; \
 	if [ -d "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions" ]; then \
-	  cp "$${zip_path}" "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions/$${name}"; \
-	  echo "[submit] grader copy ready at Gradescope_Autograder_Template/test_submissions/$${name}"; \
+	  if cp "$${zip_path}" "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions/$${name}"; then \
+	    echo "[submit] grader copy ready at Gradescope_Autograder_Template/test_submissions/$${name}"; \
+	  else \
+	    echo "[submit] warning: could not copy zip into Gradescope_Autograder_Template/test_submissions; using $${marker_rel} instead."; \
+	  fi; \
 	else \
 	  echo "[submit] Gradescope_Autograder_Template/test_submissions not found; skipping grader copy."; \
-	fi; \
-		if [ "${JUSTGRADE}" = "1" ]; then rm -f "$${zip_path}"; fi
+	fi
 	@rm -f "$(ASSIGNMENT_DIR)/submission_report.log" "$(ASSIGNMENT_DIR)/submission_report_verbose.log"
 endif
