@@ -24,6 +24,10 @@
 
 \subsection*{Assignment Overview}
 
+Read Section 5.9 of the H\&P textbook before starting.  You may also
+want to read Appendix B-10 of the textbook for a detailed description
+of Moore/Mealy state machines.
+
 The goal of this assignment is to develop:
 
 \begin{itemize}
@@ -35,10 +39,8 @@ These designs correspond to the cache system that will be implemented later in t
 All of the cache details are listed in Project Phase 2 writeup (see Section for Phase \# 2.3).
 \textbf{Read it carefully before starting!}.
 
-Read Section 5.9 of the H\&P textbook before starting.  You may also
-want to read Appendix B-10 of the textbook for a detailed description
-of Moore/Mealy state machines.
-
+As explained there, you will need to determine how your cache is arranged and functions before starting
+implementation. 
 Before beginning implementation, you should determine how your cache is arranged and how it functions.
 Drawing the state machine for your cache controller will help ensure that the controller logic behaves correctly.
 
@@ -61,6 +63,9 @@ Your schematic should show how the following components connect together:
 \end{itemize}
 
 These are the same modules that will later be connected together inside the memory system module used in the project.
+(\textsl{NOTE: these are the modules you will
+eventually use inside \texttt{mem\_system.v} in Phase 2.3}). And the state machine diagram should show the various
+states necessary to correctly operate your cache and the transitions between those states.
 
 \paragraph{Cache Controller State Machine}
 
