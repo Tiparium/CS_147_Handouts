@@ -127,13 +127,17 @@ Base command form:
 \texttt{./run test [-v] project phase\_2 [subtest]}
 \end{quote}
 
-Follow-on command form:
+Subphase command form:
 \begin{quote}
-\texttt{./run test [-v] project phase\_2\_x [-only] [-direct|-associative]}
+\texttt{./run test [-v] project phase\_2\_x [subtest]}
 \end{quote}
-\texttt{x} is the follow-on phase to be tested.
-\texttt{-only} runs only that follow-on category plus \texttt{student\_custom}.
-\texttt{-direct} and \texttt{-associative} are valid for \texttt{phase\_2\_3} and select a single cache implementation to test.
+\texttt{x} is the follow-on phase to be tested. Running \texttt{phase\_2\_1} or \texttt{phase\_2\_2} already selects only that subphase.
+
+Cache-selection form for Phase 2.3:
+\begin{quote}
+\texttt{./run test [-v] project phase\_2\_3 [-direct|-associative] [-only] [subtest]}
+\end{quote}
+By default, \texttt{phase\_2\_3} runs both cache implementations. The \texttt{-only} flag is used only with \texttt{phase\_2\_3} cache selection, together with \texttt{-direct} or \texttt{-associative}, to run just that selected cache implementation.
 
 \subsection*{Required Test Categories}
 The base \texttt{phase\_2} grading pass evaluates:
@@ -176,9 +180,9 @@ Verify your design.
 If you want to test, you can test with the \texttt{unaligned.list} test set:
 
 \begin{quote}
-\texttt{./run test project phase\_2\_1 -only}
+\texttt{./run test project phase\_2\_1}
 \end{quote}
-This runs the Phase 2.1 category (which corresponds to the unaligned-access set) plus \texttt{student\_custom}.
+This runs the Phase 2.1 category.
 
 \subsection*{Aligned single-cycle memory specification (summary)}
 Before building your cache, you should use this memory to update and test your processor's interface to properly handle unaligned accesses.
@@ -198,7 +202,7 @@ Since your single-cycle design must fetch instructions as well as read or write 
 
 \begin{center}
 \begin{figure}[h]
-\includegraphics[width=\textwidth]{memory-info.png}
+\includegraphics[width=\textwidth]{src/memory-info.png}
 \end{figure}
 \end{center}
 
@@ -243,7 +247,7 @@ You can change its value by changing the seed used for random number generation.
 
 To run the stalling-memory category:
 \begin{quote}
-\texttt{./run test project phase\_2\_2 -only}
+\texttt{./run test project phase\_2\_2}
 \end{quote}
 For seed-specific debugging, use interactive simulation and/or adjust the seed initialization in \texttt{./demo2/verilog/phase2\_2/stallmem.v}.
 
@@ -303,7 +307,7 @@ The provided memory module models a modern memory system by dividing memory into
 \end{itemize}
 
 \begin{figure}
-\includegraphics{four_bank_mem.png}
+\includegraphics{src/four_bank_mem.png}
 \caption{Four Bank Memory}
 \label{fig1}
 \end{figure}
@@ -339,7 +343,7 @@ err & Out & 1 & Raised on unaligned accesses \\
 
 
 \begin{figure}
-\includegraphics[width=\textwidth]{timing.png}
+\includegraphics[width=\textwidth]{src/timing.png}
 \caption{Timing}
 \label{fig2:Timing}
 \end{figure}
@@ -347,7 +351,7 @@ err & Out & 1 & Raised on unaligned accesses \\
 \subsection*{Cache Organization}
 
 \begin{figure}
-\includegraphics{cache.png}
+\includegraphics{src/cache.png}
 \caption{External Cache Interface}
 \label{fig3:cache}
 \end{figure}
@@ -361,7 +365,7 @@ The cache contains \textbf{256 lines}. Each line contains the following fields (
 \end{itemize}
 
 \begin{figure}
-\includegraphics[width=\textwidth]{cache_org.png}
+\includegraphics[width=\textwidth]{src/cache_org.png}
 \caption{Cache Organization}
 \label{fig4:cache-org}
 \end{figure}
@@ -486,17 +490,12 @@ Use the project test wrapper for this follow-on phase:
 \end{quote}
 By default, this runs \textbf{both} cache implementations (direct-mapped and two-way associative).
 
-Run only the 2.3 category (plus \texttt{student\_custom}):
+To run only one cache implementation within Phase 2.3, use:
 \begin{quote}
-\texttt{./run test project phase\_2\_3 -only}
-\end{quote}
-
-Test only one implementation:
-\begin{quote}
-\texttt{./run test project phase\_2\_3 -direct}
+\texttt{./run test project phase\_2\_3 -direct -only}
 \end{quote}
 \begin{quote}
-\texttt{./run test project phase\_2\_3 -associative}
+\texttt{./run test project phase\_2\_3 -associative -only}
 \end{quote}
 
 Verbose mode / targeted debugging:
