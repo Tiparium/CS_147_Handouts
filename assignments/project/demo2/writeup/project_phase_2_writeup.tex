@@ -523,7 +523,7 @@ To ensure deterministic grading, you must implement the following pseudo-random 
 \item Initialize \texttt{victimway} to zero.
 \item On each cache read or write, invert \texttt{victimway}.
 \item If both cache ways are valid during replacement, select the way indicated by \texttt{victimway}.
-\item If one way is invalid, install in the invalid way.
+\item If one way in the indexed set is invalid, place the new block in that invalid way instead of evicting a valid block. Don't evict unless the set is full.
 \end{enumerate}
 
 \subsection*{Synthesis}
