@@ -127,13 +127,17 @@ Base command form:
 \texttt{./run test [-v] project phase\_2 [subtest]}
 \end{quote}
 
-Follow-on command form:
+Subphase command form:
 \begin{quote}
-\texttt{./run test [-v] project phase\_2\_x [-only] [-direct|-associative]}
+\texttt{./run test [-v] project phase\_2\_x [subtest]}
 \end{quote}
-\texttt{x} is the follow-on phase to be tested.
-\texttt{-only} runs only that follow-on category plus \texttt{student\_custom}.
-\texttt{-direct} and \texttt{-associative} are valid for \texttt{phase\_2\_3} and select a single cache implementation to test.
+\texttt{x} is the follow-on phase to be tested. Running \texttt{phase\_2\_1} or \texttt{phase\_2\_2} already selects only that subphase.
+
+Cache-selection form for Phase 2.3:
+\begin{quote}
+\texttt{./run test [-v] project phase\_2\_3 [-direct|-associative] [-only] [subtest]}
+\end{quote}
+By default, \texttt{phase\_2\_3} runs both cache implementations. The \texttt{-only} flag is used only with \texttt{phase\_2\_3} cache selection, together with \texttt{-direct} or \texttt{-associative}, to run just that selected cache implementation.
 
 \subsection*{Required Test Categories}
 The base \texttt{phase\_2} grading pass evaluates:
@@ -176,9 +180,9 @@ Verify your design.
 If you want to test, you can test with the \texttt{unaligned.list} test set:
 
 \begin{quote}
-\texttt{./run test project phase\_2\_1 -only}
+\texttt{./run test project phase\_2\_1}
 \end{quote}
-This runs the Phase 2.1 category (which corresponds to the unaligned-access set) plus \texttt{student\_custom}.
+This runs the Phase 2.1 category.
 
 \subsection*{Aligned single-cycle memory specification (summary)}
 Before building your cache, you should use this memory to update and test your processor's interface to properly handle unaligned accesses.
@@ -243,7 +247,7 @@ You can change its value by changing the seed used for random number generation.
 
 To run the stalling-memory category:
 \begin{quote}
-\texttt{./run test project phase\_2\_2 -only}
+\texttt{./run test project phase\_2\_2}
 \end{quote}
 For seed-specific debugging, use interactive simulation and/or adjust the seed initialization in \texttt{./demo2/verilog/phase2\_2/stallmem.v}.
 
@@ -302,12 +306,20 @@ The provided memory module models a modern memory system by dividing memory into
 \item Memory is split into \textbf{four banks}
 \end{itemize}
 
+\begin{figure}
+\includegraphics{four_bank_mem.png}
+\caption{Four Bank Memory}
+\label{fig1}
+\end{figure}
+
 The least significant address bits determine the memory bank. Because addresses are word aligned, bit 0 is always zero.
 Therefore bits \texttt{Addr[2:1]} determine the bank.
 
 If two accesses target the same bank within four cycles, the second request will stall.
 
-Key signals:
+Figure~\ref{fig1} shows the external interface to the module.  Figure~\ref{fig2:Timing} shows the timing specification.
+
+Each signal is described below:
 
 \begin{center}
 \begin{tabular}{|l|c|c|p{8cm}|}
@@ -329,10 +341,22 @@ err & Out & 1 & Raised on unaligned accesses \\
 \end{tabular}
 \end{center}
 
+
+\begin{figure}
+\includegraphics[width=\textwidth]{timing.png}
+\caption{Timing}
+\label{fig2:Timing}
+\end{figure}
+
 \subsection*{Cache Organization}
 
-The cache contains \textbf{256 lines}. Each line contains:
+\begin{figure}
+\includegraphics{cache.png}
+\caption{External Cache Interface}
+\label{fig3:cache}
+\end{figure}
 
+The cache contains \textbf{256 lines}. Each line contains the following fields (see Figure~\ref{fig4:cache-org}):
 \begin{itemize}
 \item Valid bit
 \item Dirty bit
@@ -340,9 +364,17 @@ The cache contains \textbf{256 lines}. Each line contains:
 \item Four 16-bit words
 \end{itemize}
 
-Cache interface signals:
+\begin{figure}
+\includegraphics[width=\textwidth]{cache_org.png}
+\caption{Cache Organization}
+\label{fig4:cache-org}
+\end{figure}
+
+
+Figure~\ref{fig3:cache} shows the external cache interface.  Each interface signal is described in table below (see Table~\ref{tab:cache-signals}):
 
 \begin{center}
+\begin{table}
 \begin{tabular}{|l|c|c|p{8cm}|}
 \hline
 Signal & Direction & Width & Description \\
@@ -367,6 +399,9 @@ valid & Out & 1 & Valid bit state \\
 err & Out & 1 & Error condition \\
 \hline
 \end{tabular}
+\caption{Cache Interface Signals}
+\label{tab:cache-signals}
+\end{table}
 \end{center}
 
 \subsection*{Cache Access Modes}
@@ -455,17 +490,12 @@ Use the project test wrapper for this follow-on phase:
 \end{quote}
 By default, this runs \textbf{both} cache implementations (direct-mapped and two-way associative).
 
-Run only the 2.3 category (plus \texttt{student\_custom}):
+To run only one cache implementation within Phase 2.3, use:
 \begin{quote}
-\texttt{./run test project phase\_2\_3 -only}
-\end{quote}
-
-Test only one implementation:
-\begin{quote}
-\texttt{./run test project phase\_2\_3 -direct}
+\texttt{./run test project phase\_2\_3 -direct -only}
 \end{quote}
 \begin{quote}
-\texttt{./run test project phase\_2\_3 -associative}
+\texttt{./run test project phase\_2\_3 -associative -only}
 \end{quote}
 
 Verbose mode / targeted debugging:

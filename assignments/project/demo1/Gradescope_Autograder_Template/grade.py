@@ -14,11 +14,14 @@ CONFIG = {
     "total_points": 400.0,
     "clamp_low": 0.0,
     "clamp_high": 100.0,
+    "phase_1_offset_points": 1.0,
 }
 
 TOTAL_POINTS = float(os.environ.get("TOTAL_POINTS", CONFIG.get("total_points", 100.0)))
 C_L = float(CONFIG.get("clamp_low", 0.0))
 C_H = float(CONFIG.get("clamp_high", 100.0))
+PHASE_1_OFFSET_POINTS = float(CONFIG.get("phase_1_offset_points", 0.0))
+PHASE_1_EXTRA_CREDIT_TESTS = {"siic_0"}
 
 
 def clamp(value: float, low: float = C_L, high: float = C_H) -> float:
@@ -114,6 +117,10 @@ def normalize_group(group: str) -> str:
     return group
 
 
+def is_phase_1_extra_credit_test(name: str) -> bool:
+    return name in PHASE_1_EXTRA_CREDIT_TESTS
+
+
 def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, List[str], List[Dict]]:
     notes: List[str] = []
     tests: List[Dict] = []
@@ -179,24 +186,52 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
 
     supplied = summary.get("supplied", {})
     student = summary.get("student_custom", {})
-    supplied_total = int(supplied.get("tests", 0))
-    supplied_pass = int(supplied.get("passed", 0))
-    supplied_fail = int(supplied.get("failed", max(0, supplied_total - supplied_pass)))
+    tests_data = summary.get("tests", [])
+
+    supplied_total = 0
+    supplied_pass = 0
+    extra_total = 0
+    extra_pass = 0
     student_total = int(student.get("tests", 0))
     student_pass = int(student.get("passed", 0))
     student_fail = int(student.get("failed", max(0, student_total - student_pass)))
 
     group_totals: Dict[str, int] = {}
     group_passes: Dict[str, int] = {}
-    for t in summary.get("tests", []):
-        if str(t.get("category", "")) != "supplied":
+    for t in tests_data:
+        name = str(t.get("test", "")).strip()
+        category = str(t.get("category", ""))
+        status = str(t.get("status", "")).upper()
+
+        if category == "student_custom":
             continue
+        if is_phase_1_extra_credit_test(name):
+            extra_total += 1
+            if status == "PASS":
+                extra_pass += 1
+            continue
+        if category != "supplied":
+            continue
+
+        supplied_total += 1
+        if status == "PASS":
+            supplied_pass += 1
+
         group = normalize_group(str(t.get("group", "unknown")))
         group_totals[group] = group_totals.get(group, 0) + 1
-        if str(t.get("status", "")).upper() == "PASS":
+        if status == "PASS":
             group_passes[group] = group_passes.get(group, 0) + 1
 
+    if supplied_total == 0 and extra_total == 0 and not tests_data:
+        supplied_total = int(supplied.get("tests", 0))
+        supplied_pass = int(supplied.get("passed", 0))
+
+    supplied_fail = max(0, supplied_total - supplied_pass)
+    extra_fail = max(0, extra_total - extra_pass)
+
     base_points = float(supplied_pass)
+    offset_points = PHASE_1_OFFSET_POINTS
+    extra_credit_points = float(extra_pass)
     bonus_points = 0.0
     perfect_groups: List[str] = []
     for group, total in sorted(group_totals.items()):
@@ -205,19 +240,24 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
             perfect_groups.append(group)
             bonus_points += 0.10 * float(total)
 
-    uncapped_points = base_points + bonus_points
-    final_points = min(TOTAL_POINTS, uncapped_points)
+    capped_points_before_extra = min(TOTAL_POINTS, base_points + offset_points + bonus_points)
+    uncapped_points = capped_points_before_extra + extra_credit_points
+    final_points = min(TOTAL_POINTS + extra_credit_points, uncapped_points)
     raw_percent = 0.0 if TOTAL_POINTS <= 0 else (final_points / TOTAL_POINTS) * 100.0
 
     notes.insert(0, f"Hash status: {hash_status}")
-    notes.append(f"Scoring policy: supplied tests only")
+    notes.append("Scoring policy: supplied tests + Phase 1 offset + Phase 1 extra credit")
     notes.append(f"Supplied tests: {supplied_total} total, {supplied_pass} passed, {supplied_fail} failed")
+    notes.append(f"Phase 1 extra-credit tests: {extra_total} total, {extra_pass} passed, {extra_fail} failed")
     notes.append(f"Student tests: {student_total} total, {student_pass} passed, {student_fail} failed (not scored)")
     notes.append(f"Base points (1 per supplied pass): {base_points:.2f}")
+    notes.append(f"Phase 1 offset points: {offset_points:.2f}")
+    notes.append(f"Extra-credit points (1 per extra-credit pass): {extra_credit_points:.2f}")
     notes.append(f"Bonus points (+10% per perfect supplied group): {bonus_points:.2f}")
     notes.append(f"Perfect supplied groups: {', '.join(perfect_groups) if perfect_groups else '(none)'}")
-    notes.append(f"Pre-cap points: {uncapped_points:.2f}")
-    if uncapped_points > TOTAL_POINTS:
+    notes.append(f"Points before extra credit cap: {capped_points_before_extra:.2f}")
+    notes.append(f"Final points after extra credit: {final_points:.2f}")
+    if base_points + offset_points + bonus_points > TOTAL_POINTS:
         notes.append(f"Hard cap applied: {TOTAL_POINTS:.2f}")
 
     tests.append({
@@ -226,11 +266,13 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
         "max_score": TOTAL_POINTS,
         "output": (
             f"Passes: {supplied_pass}/{supplied_total} supplied tests; "
-            f"bonus={bonus_points:.2f}; pre-cap={uncapped_points:.2f}; cap={TOTAL_POINTS:.2f}"
+            f"offset={offset_points:.2f}; extra={extra_credit_points:.2f}; "
+            f"bonus={bonus_points:.2f}; capped_before_extra={capped_points_before_extra:.2f}; "
+            f"final={final_points:.2f}; base_cap={TOTAL_POINTS:.2f}"
         ),
     })
 
-    return raw_percent, final_points, bonus_points, notes, tests
+    return raw_percent, final_points, bonus_points + extra_credit_points, notes, tests
 
 
 def main() -> int:
@@ -239,7 +281,7 @@ def main() -> int:
     raw_percent, final_points, bonus_points, notes, tests = run_assignment_tests(sub_root)
     raw_percent = clamp(raw_percent)
     curved_percent = raw_percent
-    final_score = min(TOTAL_POINTS, final_points)
+    final_score = final_points
 
     print("=== Grading Summary ===")
     print(f"Total points: {TOTAL_POINTS:.2f}")
