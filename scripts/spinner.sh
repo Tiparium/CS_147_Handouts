@@ -25,7 +25,17 @@ spinner_wait() {
     done
   fi
 
-  wait "$pid"; local rc=$?
+  local rc=0
+  set +e
+  wait "$pid" 2>/dev/null
+  rc=$?
+  set -e
+  if [ "$rc" -gt 128 ]; then
+    # When spinner_wait runs in a helper/background shell, the tracked pid is
+    # often not a direct child of that shell. In that case `wait` reports an
+    # error; the caller is responsible for collecting the real command status.
+    rc=0
+  fi
   local elapsed=$(( $(date +%s) - start_ts ))
   local mins=$((elapsed / 60))
   local secs=$((elapsed % 60))

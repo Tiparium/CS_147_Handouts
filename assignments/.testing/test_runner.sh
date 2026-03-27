@@ -107,6 +107,17 @@ hw4_answer_section_has_content() {
   ' "$file"
 }
 
+hw5_check_required_file() {
+  local file_path="$1"
+  local display_path="$2"
+  if [ -f "$file_path" ]; then
+    echo "[x] $display_path"
+    return 0
+  fi
+  echo "[ ] $display_path"
+  return 1
+}
+
 run_assignment() {
   local assignment="$1"
   local subproblem="${2:-}"
@@ -139,7 +150,7 @@ run_assignment() {
     shopt -s nullglob
     bench_files=(*_bench.v tb_*.v)
     shopt -u nullglob
-    if [ "$assignment" != "hw04" ]; then
+    if [ "$assignment" != "hw04" ] && [ "$assignment" != "hw05" ]; then
       if [ "${#bench_files[@]}" -eq 0 ]; then
         echo "[FAIL] $(basename "$subdir"): no testbench found."
         overall_status=1
@@ -150,13 +161,13 @@ run_assignment() {
     checker_status=0
     checker_label="PASS"
     checker_log="verilog_checker.log"
-    if [ "$assignment" = "hw04" ]; then
+    if [ "$assignment" = "hw04" ] || [ "$assignment" = "hw05" ]; then
       checker_label="Not Applicable"
       if [ "$VERBOSE" -eq 1 ]; then
         echo "============================================================"
         echo "[CHECKER] $(basename "$subdir")"
         echo "------------------------------------------------------------"
-        echo "[SKIP] Verilog checker not applicable for HW4."
+        echo "[SKIP] Verilog checker not applicable for $assignment."
       fi
     else
       if [ "$VERBOSE" -eq 1 ]; then
@@ -174,7 +185,22 @@ run_assignment() {
     fi
 
     sub_errors=0
-    if [ "$assignment" = "hw04" ]; then
+    if [ "$assignment" = "hw05" ]; then
+      case "$(basename "$subdir")" in
+        hw5_1|hw5_2)
+          if ! hw5_check_required_file "schematic.pdf" "$(basename "$subdir")/schematic.pdf"; then
+            sub_errors=$((sub_errors + 1))
+          fi
+          if ! hw5_check_required_file "cacheFSM.pdf" "$(basename "$subdir")/cacheFSM.pdf"; then
+            sub_errors=$((sub_errors + 1))
+          fi
+          ;;
+        *)
+          echo "[ERROR] $(basename "$subdir"): unknown HW5 subproblem."
+          sub_errors=$((sub_errors + 1))
+          ;;
+      esac
+    elif [ "$assignment" = "hw04" ]; then
       shopt -s nullglob
       asm_files=(*.asm)
       shopt -u nullglob

@@ -40,6 +40,8 @@ submit:
 	(cd "$(ASSIGNMENT_DIR)" && \
 	  if [ "$(ASSIGNMENT_NAME)" = "hw04" ]; then \
 	    files="$$(find . \( -type f -o -type l \) \( -name '*.v' -o -name '*.sv' -o -name '*.asm' -o -name '*.txt' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
+	  elif [ "$(ASSIGNMENT_NAME)" = "hw05" ]; then \
+	    files=""; \
 	  else \
 	    files="$$(find . \( -type f -o -type l \) \( -name '*.v' -o -name '*.sv' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
 	  fi; \
