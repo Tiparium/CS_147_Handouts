@@ -89,9 +89,18 @@ print_help() {
   [Tests & Submission]
     ./run test <hw> [sub]        Run assignment testbenches (all subproblems or one if specified).
     ./run test project phase_1 [list|<test>] Run project Phase 1 tests (list or single test).
+    ./run test project phase_2 [list|<test>] Run project Phase 2 base tests.
+    ./run test project phase_2_1 [list|<test>] Run Phase 2.1 aligned-memory tests.
+    ./run test project phase_2_2 [list|<test>] Run Phase 2.2 stalling-memory tests.
+    ./run test project phase_2_3 [-direct|-associative] [-only] [subtest]
+                                         Run Phase 2.3 cache-system tests.
     ./run test project ... -justtimer  Simulate project test timing only (no tests executed).
     ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
     ./run build_submission project phase_1 Build project Phase 1 submission package.
+    ./run build_submission project phase_2 Build Project Phase 2 submission package.
+    ./run build_submission project phase_2_1 Build Project Phase 2.1 submission package.
+    ./run build_submission project phase_2_2 Build Project Phase 2.2 submission package.
+    ./run build_submission project phase_2_3 Build Project Phase 2.3 submission package.
     ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see scripts/verilog_checker/verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
@@ -958,6 +967,34 @@ case "${1:-}" in
             extra_make_args+=("$1")
           fi
           ;;
+        phase2|phase_2|2)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_2"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
+        phase2_1|phase_2_1|2_1)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_2_1"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
+        phase2_2|phase_2_2|2_2)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_2_2"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
+        phase2_3|phase_2_3|2_3)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_2_3"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
         *) extra_make_args+=("$1") ;;
       esac
       shift
@@ -1039,7 +1076,10 @@ case "${1:-}" in
     if [ "$assignment_arg" = "project" ]; then
       case "$project_phase_arg" in
         phase_1) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
-        phase_2) grader_dir="$REPO_ROOT/assignments/project/demo2/Gradescope_Autograder_Template" ;;
+        phase_2) grader_dir="$REPO_ROOT/assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2" ;;
+        phase_2_1) grader_dir="$REPO_ROOT/assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_1" ;;
+        phase_2_2) grader_dir="$REPO_ROOT/assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_2" ;;
+        phase_2_3) grader_dir="$REPO_ROOT/assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_3" ;;
         phase_3) grader_dir="$REPO_ROOT/assignments/project/demo3/Gradescope_Autograder_Template" ;;
         *) grader_dir="$REPO_ROOT/assignments/project/demo1/Gradescope_Autograder_Template" ;;
       esac
@@ -1056,7 +1096,14 @@ case "${1:-}" in
     else
       zip_name="${rel_entry##*/}"
       if [ "$assignment_arg" = "project" ]; then
-        legacy_rel="assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name"
+        case "$project_phase_arg" in
+          phase_1) legacy_rel="assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name" ;;
+          phase_2) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2/test_submissions/$zip_name" ;;
+          phase_2_1) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_1/test_submissions/$zip_name" ;;
+          phase_2_2) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_2/test_submissions/$zip_name" ;;
+          phase_2_3) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_3/test_submissions/$zip_name" ;;
+          *) legacy_rel="assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name" ;;
+        esac
       else
         legacy_rel="assignments/$assignment_arg/Gradescope_Autograder_Template/test_submissions/$zip_name"
       fi
