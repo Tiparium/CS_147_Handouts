@@ -14,12 +14,14 @@ CONFIG = {
     "total_points": 400.0,
     "clamp_low": 0.0,
     "clamp_high": 100.0,
+    "phase_1_offset_points": 1.0,
 }
 
 TOTAL_POINTS = float(os.environ.get("TOTAL_POINTS", CONFIG.get("total_points", 100.0)))
 C_L = float(CONFIG.get("clamp_low", 0.0))
 C_H = float(CONFIG.get("clamp_high", 100.0))
-EXTRA_CREDIT_TESTS = {"siic_0", "rti_0"}
+PHASE_1_OFFSET_POINTS = float(CONFIG.get("phase_1_offset_points", 0.0))
+PHASE_1_EXTRA_CREDIT_TESTS = {"siic_0"}
 
 
 def clamp(value: float, low: float = C_L, high: float = C_H) -> float:
@@ -80,6 +82,23 @@ def recompute_hashes(submission_root: Path) -> Dict[str, str]:
     return out
 
 
+def recompute_expected_hashes(submission_root: Path, expected_paths: List[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for rel in sorted(expected_paths):
+        if rel == "submission_report.log":
+            continue
+        p = (submission_root / rel).resolve()
+        try:
+            if not p.exists() or p.is_dir():
+                out[rel] = "__MISSING__"
+                continue
+            with p.open("rb") as f:
+                out[rel] = hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            out[rel] = "__ERROR__"
+    return out
+
+
 def hash_report(title: str, mapping: Dict[str, str]) -> List[str]:
     rep: List[str] = []
     rep.append(f"================ {title} ================")
@@ -98,6 +117,10 @@ def normalize_group(group: str) -> str:
     return group
 
 
+def is_phase_1_extra_credit_test(name: str) -> bool:
+    return name in PHASE_1_EXTRA_CREDIT_TESTS
+
+
 def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, List[str], List[Dict]]:
     notes: List[str] = []
     tests: List[Dict] = []
@@ -108,16 +131,22 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
 
     hash_status = "MISSING"
     if expected_hashes:
-        expected_source_hashes = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
-        actual_source_hashes = {k: v for k, v in actual_hashes.items() if k != "submission_report.log"}
-        expected_report_hash = expected_hashes.get("submission_report.log")
-        actual_report_hash = actual_hashes.get("submission_report.log")
-        if expected_source_hashes != actual_source_hashes:
+        expected_files = {k: v for k, v in expected_hashes.items() if k != "submission_report.log"}
+        expected_report = expected_hashes.get("submission_report.log")
+        actual_files = recompute_expected_hashes(submission_root, list(expected_files.keys()))
+
+        source_mismatch = expected_files != actual_files
+        report_mismatch = False
+        if expected_report is not None:
+            actual_report = _hash_report_body(submission_root / "submission_report.log")
+            report_mismatch = (actual_report != expected_report)
+
+        if source_mismatch:
             hash_status = "MISMATCH"
-            notes.append("Source-file hash mismatch between report and submission files (scoring forced to 0).")
+            notes.append("Hash mismatch between expected and actual submission files (scoring forced to 0).")
             if VERBOSE or HASH_VERBOSE:
-                notes.extend(hash_report("HASH REPORT (expected)", expected_hashes))
-                notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
+                notes.extend(hash_report("HASH REPORT (expected source)", expected_files))
+                notes.extend(hash_report("HASH REPORT (actual source)", actual_files))
             notes.insert(0, f"Hash status: {hash_status}")
             tests.append({
                 "name": "project_phase_1",
@@ -126,11 +155,9 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
                 "output": "Source-file hash mismatch detected.",
             })
             return 0.0, 0.0, 0.0, notes, tests
-        if expected_report_hash != actual_report_hash:
-            hash_status = "REPORT_MISMATCH"
-            notes.append("submission_report.log body hash drift detected; treating as non-fatal.")
-        else:
-            hash_status = "OK"
+        hash_status = "REPORT_MISMATCH" if report_mismatch else "OK"
+        if report_mismatch:
+            notes.append("submission_report.log hash mismatch detected (non-fatal).")
 
     summary_path = submission_root / "project_phase_1_grade_summary.json"
     if not summary_path.exists():
@@ -158,31 +185,53 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
         return 0.0, 0.0, 0.0, notes, tests
 
     student = summary.get("student_custom", {})
+    tests_data = summary.get("tests", [])
+
+    supplied_total = 0
+    supplied_pass = 0
+    extra_total = 0
+    extra_pass = 0
     student_total = int(student.get("tests", 0))
     student_pass = int(student.get("passed", 0))
     student_fail = int(student.get("failed", max(0, student_total - student_pass)))
 
-    supplied_total = 0
-    supplied_pass = 0
     group_totals: Dict[str, int] = {}
     group_passes: Dict[str, int] = {}
-    excluded_extra_credit: List[str] = []
-    for t in summary.get("tests", []):
-        if str(t.get("category", "")) != "supplied":
-            continue
+    for t in tests_data:
         name = str(t.get("test", "")).strip()
-        if name in EXTRA_CREDIT_TESTS:
-            excluded_extra_credit.append(name)
+        category = str(t.get("category", ""))
+        status = str(t.get("status", "")).upper()
+
+        if category == "student_custom":
             continue
+        if is_phase_1_extra_credit_test(name):
+            extra_total += 1
+            if status == "PASS":
+                extra_pass += 1
+            continue
+        if category != "supplied":
+            continue
+
         supplied_total += 1
+        if status == "PASS":
+            supplied_pass += 1
+
         group = normalize_group(str(t.get("group", "unknown")))
         group_totals[group] = group_totals.get(group, 0) + 1
-        if str(t.get("status", "")).upper() == "PASS":
-            supplied_pass += 1
+        if status == "PASS":
             group_passes[group] = group_passes.get(group, 0) + 1
     supplied_fail = max(0, supplied_total - supplied_pass)
 
+    if supplied_total == 0 and extra_total == 0 and not tests_data:
+        supplied_total = int(supplied.get("tests", 0))
+        supplied_pass = int(supplied.get("passed", 0))
+
+    supplied_fail = max(0, supplied_total - supplied_pass)
+    extra_fail = max(0, extra_total - extra_pass)
+
     base_points = float(supplied_pass)
+    offset_points = PHASE_1_OFFSET_POINTS
+    extra_credit_points = float(extra_pass)
     bonus_points = 0.0
     perfect_groups: List[str] = []
     for group, total in sorted(group_totals.items()):
@@ -191,21 +240,24 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
             perfect_groups.append(group)
             bonus_points += 0.10 * float(total)
 
-    uncapped_points = base_points + bonus_points
-    final_points = min(TOTAL_POINTS, uncapped_points)
+    capped_points_before_extra = min(TOTAL_POINTS, base_points + offset_points + bonus_points)
+    uncapped_points = capped_points_before_extra + extra_credit_points
+    final_points = min(TOTAL_POINTS + extra_credit_points, uncapped_points)
     raw_percent = 0.0 if TOTAL_POINTS <= 0 else (final_points / TOTAL_POINTS) * 100.0
 
     notes.insert(0, f"Hash status: {hash_status}")
-    notes.append(f"Scoring policy: supplied tests only")
+    notes.append("Scoring policy: supplied tests + Phase 1 offset + Phase 1 extra credit")
     notes.append(f"Supplied tests: {supplied_total} total, {supplied_pass} passed, {supplied_fail} failed")
+    notes.append(f"Phase 1 extra-credit tests: {extra_total} total, {extra_pass} passed, {extra_fail} failed")
     notes.append(f"Student tests: {student_total} total, {student_pass} passed, {student_fail} failed (not scored)")
-    if excluded_extra_credit:
-        notes.append(f"Excluded extra-credit supplied tests: {', ' .join(sorted(set(excluded_extra_credit)))}")
     notes.append(f"Base points (1 per supplied pass): {base_points:.2f}")
+    notes.append(f"Phase 1 offset points: {offset_points:.2f}")
+    notes.append(f"Extra-credit points (1 per extra-credit pass): {extra_credit_points:.2f}")
     notes.append(f"Bonus points (+10% per perfect supplied group): {bonus_points:.2f}")
     notes.append(f"Perfect supplied groups: {', '.join(perfect_groups) if perfect_groups else '(none)'}")
-    notes.append(f"Pre-cap points: {uncapped_points:.2f}")
-    if uncapped_points > TOTAL_POINTS:
+    notes.append(f"Points before extra credit cap: {capped_points_before_extra:.2f}")
+    notes.append(f"Final points after extra credit: {final_points:.2f}")
+    if base_points + offset_points + bonus_points > TOTAL_POINTS:
         notes.append(f"Hard cap applied: {TOTAL_POINTS:.2f}")
 
     tests.append({
@@ -214,11 +266,13 @@ def run_assignment_tests(submission_root: Path) -> Tuple[float, float, float, Li
         "max_score": TOTAL_POINTS,
         "output": (
             f"Passes: {supplied_pass}/{supplied_total} supplied tests; "
-            f"bonus={bonus_points:.2f}; pre-cap={uncapped_points:.2f}; cap={TOTAL_POINTS:.2f}"
+            f"offset={offset_points:.2f}; extra={extra_credit_points:.2f}; "
+            f"bonus={bonus_points:.2f}; capped_before_extra={capped_points_before_extra:.2f}; "
+            f"final={final_points:.2f}; base_cap={TOTAL_POINTS:.2f}"
         ),
     })
 
-    return raw_percent, final_points, bonus_points, notes, tests
+    return raw_percent, final_points, bonus_points + extra_credit_points, notes, tests
 
 
 def main() -> int:
@@ -227,7 +281,7 @@ def main() -> int:
     raw_percent, final_points, bonus_points, notes, tests = run_assignment_tests(sub_root)
     raw_percent = clamp(raw_percent)
     curved_percent = raw_percent
-    final_score = min(TOTAL_POINTS, final_points)
+    final_score = final_points
 
     print("=== Grading Summary ===")
     print(f"Total points: {TOTAL_POINTS:.2f}")

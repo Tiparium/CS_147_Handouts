@@ -4,6 +4,7 @@
 \usepackage{xurl}
 \usepackage[table]{xcolor}
 \usepackage{hyperref}
+\usepackage{graphicx}
 \hypersetup{
   colorlinks=true,
   urlcolor=blue,
@@ -102,20 +103,8 @@ Please include this information in a PDF file titled \texttt{instruction\_timeli
 \texttt{./demo2/writeup/instruction\_timeline.pdf}
 \end{quote}
 
-\subsection*{Submitting}
-To generate your Phase 2 submission file, use:
-\begin{quote}
-\texttt{./run build\_submission project phase\_2}
-\end{quote}
-
-This follows the same submission workflow used in Phase 1: run the Phase 2 test flow, package the expected files, and produce a submission zip for upload.
-
-Your generated submission zip will be written to:
-\begin{quote}
-\path{./generated_turnins/project_phase_2}
-\end{quote}
-
-Upload the generated zip file to the corresponding Phase 2 Gradescope assignment.
+\subsection*{Synthesis}
+You should also synthesize your processor and submit the results of synthesis, including the area, cell, and timing reports.  This is similar to what you did for Lab 3.
 
 \subsection*{Testing Commands}
 Base command form:
@@ -123,13 +112,17 @@ Base command form:
 \texttt{./run test [-v] project phase\_2 [subtest]}
 \end{quote}
 
-Follow-on command form:
+Subphase command form:
 \begin{quote}
-\texttt{./run test [-v] project phase\_2\_x [-only] [-direct|-associative]}
+\texttt{./run test [-v] project phase\_2\_x [subtest]}
 \end{quote}
-\texttt{x} is the follow-on phase to be tested.
-\texttt{-only} runs only that follow-on category plus \texttt{student\_custom}.
-\texttt{-direct} and \texttt{-associative} are valid for \texttt{phase\_2\_3} and select a single cache implementation to test.
+\texttt{x} is the follow-on phase to be tested. Running \texttt{phase\_2\_1} or \texttt{phase\_2\_2} already selects only that subphase.
+
+Cache-selection form for Phase 2.3:
+\begin{quote}
+\texttt{./run test [-v] project phase\_2\_3 [-direct|-associative] [-only] [subtest]}
+\end{quote}
+By default, \texttt{phase\_2\_3} runs both cache implementations. The \texttt{-only} flag is used only with \texttt{phase\_2\_3} cache selection, together with \texttt{-direct} or \texttt{-associative}, to run just that selected cache implementation.
 
 \subsection*{Required Test Categories}
 The base \texttt{phase\_2} grading pass evaluates:
@@ -172,9 +165,9 @@ Verify your design.
 If you want to test, you can test with the \texttt{unaligned.list} test set:
 
 \begin{quote}
-\texttt{./run test project phase\_2\_1 -only}
+\texttt{./run test project phase\_2\_1}
 \end{quote}
-This runs the Phase 2.1 category (which corresponds to the unaligned-access set) plus \texttt{student\_custom}.
+This runs the Phase 2.1 category.
 
 \subsection*{Aligned single-cycle memory specification (summary)}
 Before building your cache, you should use this memory to update and test your processor's interface to properly handle unaligned accesses.
@@ -191,6 +184,25 @@ The Verilog source is provided at:
 \end{quote}
 
 Since your single-cycle design must fetch instructions as well as read or write data in the same cycle, you will want to use two instances of this memory --- one for data, and one for instructions.
+
+\begin{center}
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{src/memory-info.png}
+\end{figure}
+\end{center}
+
+During each cycle, the ``enable" and ``wr" inputs determine what function the memory
+will perform. On an unaligned access err is set.
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|} \hline
+enable & wr & Function & data\_out & err \\ \hline
+0 & X & No operation & 0 & 0 \\ \hline
+1 &.0 & Read & M[addr] & 0 \\ \hline
+1 & 1 & Write & Write data\_in & 0 \\ \hline
+1 & X & X & if (addr[0]) set & 1 \\ \hline
+\end{tabular}
+\end{center}
 
 \section*{Phase \#2.2 --- Pipelined Design with Stalling Memory (Optional)}
 \textbf{No submission required. This is optional.}
@@ -220,7 +232,7 @@ You can change its value by changing the seed used for random number generation.
 
 To run the stalling-memory category:
 \begin{quote}
-\texttt{./run test project phase\_2\_2 -only}
+\texttt{./run test project phase\_2\_2}
 \end{quote}
 For seed-specific debugging, use interactive simulation and/or adjust the seed initialization in \texttt{./demo2/verilog/phase2\_2/stallmem.v}.
 
@@ -279,12 +291,20 @@ The provided memory module models a modern memory system by dividing memory into
 \item Memory is split into \textbf{four banks}
 \end{itemize}
 
+\begin{figure}
+\includegraphics{src/four_bank_mem.png}
+\caption{Four Bank Memory}
+\label{fig1}
+\end{figure}
+
 The least significant address bits determine the memory bank. Because addresses are word aligned, bit 0 is always zero.
 Therefore bits \texttt{Addr[2:1]} determine the bank.
 
 If two accesses target the same bank within four cycles, the second request will stall.
 
-Key signals:
+Figure~\ref{fig1} shows the external interface to the module.  Figure~\ref{fig2:Timing} shows the timing specification.
+
+Each signal is described below:
 
 \begin{center}
 \begin{tabular}{|l|c|c|p{8cm}|}
@@ -306,10 +326,22 @@ err & Out & 1 & Raised on unaligned accesses \\
 \end{tabular}
 \end{center}
 
+
+\begin{figure}
+\includegraphics[width=\textwidth]{src/timing.png}
+\caption{Timing}
+\label{fig2:Timing}
+\end{figure}
+
 \subsection*{Cache Organization}
 
-The cache contains \textbf{256 lines}. Each line contains:
+\begin{figure}
+\includegraphics{src/cache.png}
+\caption{External Cache Interface}
+\label{fig3:cache}
+\end{figure}
 
+The cache contains \textbf{256 lines}. Each line contains the following fields (see Figure~\ref{fig4:cache-org}):
 \begin{itemize}
 \item Valid bit
 \item Dirty bit
@@ -317,9 +349,17 @@ The cache contains \textbf{256 lines}. Each line contains:
 \item Four 16-bit words
 \end{itemize}
 
-Cache interface signals:
+\begin{figure}
+\includegraphics[width=\textwidth]{src/cache_org.png}
+\caption{Cache Organization}
+\label{fig4:cache-org}
+\end{figure}
+
+
+Figure~\ref{fig3:cache} shows the external cache interface.  Each interface signal is described in table below (see Table~\ref{tab:cache-signals}):
 
 \begin{center}
+\begin{table}
 \begin{tabular}{|l|c|c|p{8cm}|}
 \hline
 Signal & Direction & Width & Description \\
@@ -344,49 +384,10 @@ valid & Out & 1 & Valid bit state \\
 err & Out & 1 & Error condition \\
 \hline
 \end{tabular}
+\caption{Cache Interface Signals}
+\label{tab:cache-signals}
+\end{table}
 \end{center}
-
-\subsection*{Cache Access Modes}
-
-The cache operates using two control signals: \texttt{comp} and \texttt{write}. The four possible combinations are:
-
-\textbf{Compare Read (comp=1, write=0)}
-
-Used during load instructions.
-
-\begin{itemize}
-\item Tag is compared with stored tag
-\item If hit, data is returned immediately
-\item If miss, the valid and dirty bits of the current line are observed
-\end{itemize}
-
-\textbf{Compare Write (comp=1, write=1)}
-
-Used during store instructions.
-
-\begin{itemize}
-\item If hit, data is written to the cache line
-\item Dirty bit is set
-\item If miss, cache contents are not modified
-\end{itemize}
-
-\textbf{Access Read (comp=0, write=0)}
-
-Used internally when evicting a cache line.
-
-\begin{itemize}
-\item Tag, valid, dirty, and data values are read from the cache
-\end{itemize}
-
-\textbf{Access Write (comp=0, write=1)}
-
-Used when filling a cache line from memory.
-
-\begin{itemize}
-\item Data and tag are written into the cache
-\item Valid bit is set
-\item Dirty bit is cleared
-\end{itemize}
 
 \subsection*{State Machine}
 
@@ -416,31 +417,56 @@ First implement a direct-mapped cache in the directory:
 
 You should thoroughly test this version before proceeding to the associative version.
 
-\subsection*{Testing}
+\subsection*{Signal Interactions}
 
-Use the project test wrapper for this follow-on phase:
-\begin{quote}
-\texttt{./run test project phase\_2\_3}
-\end{quote}
-By default, this runs \textbf{both} cache implementations (direct-mapped and two-way associative).
+When \texttt{enable} is high, the direct-mapped cache behavior is determined by
+the \texttt{comp} and \texttt{write} control signals.
 
-Run only the 2.3 category (plus \texttt{student\_custom}):
-\begin{quote}
-\texttt{./run test project phase\_2\_3 -only}
-\end{quote}
-
-Test only one implementation:
-\begin{quote}
-\texttt{./run test project phase\_2\_3 -direct}
-\end{quote}
-\begin{quote}
-\texttt{./run test project phase\_2\_3 -associative}
-\end{quote}
-
-Verbose mode / targeted debugging:
-\begin{quote}
-\texttt{./run test -v project phase\_2\_3 [subtest]}
-\end{quote}
+\begin{center}
+\begingroup
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.03}
+\begin{tabular}{|p{3.2cm}|p{3.2cm}|p{7.2cm}|}
+\hline
+\textbf{Mode} & \textbf{When Used} & \textbf{Behavior} \\
+\hline
+Compare Read \newline (\texttt{comp=1, write=0}) &
+Load instructions &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ \texttt{tag\_in}, \texttt{index}, and \texttt{offset} must be valid.\\
+$\bullet$ A hit or miss is reported in the same cycle.\\
+$\bullet$ On a hit, \texttt{data\_out} returns the selected word.\\
+$\bullet$ On a miss, \texttt{valid} and \texttt{dirty} describe the current line.\\[0.15em]} \\
+\hline
+Compare Write \newline (\texttt{comp=1, write=1}) &
+Store instructions &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ \texttt{data\_in}, \texttt{tag\_in}, \texttt{index}, and \texttt{offset} must be valid.\\
+$\bullet$ On a hit, the selected word is written at the rising edge.\\
+$\bullet$ The dirty bit is set to 1 on a hit.\\
+$\bullet$ A hit on an invalid line should still be treated as a miss.\\
+$\bullet$ During a compare-write hit, \texttt{dirty} is not meaningful.\\[0.15em]} \\
+\hline
+Access Read \newline (\texttt{comp=0, write=0}) &
+Victim inspection / writeback preparation &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ The cache behaves like a RAM.\\
+$\bullet$ \texttt{index} and \texttt{offset} select the line and word to inspect.\\
+$\bullet$ \texttt{data\_out}, \texttt{tag\_out}, \texttt{valid}, and \texttt{dirty} are meaningful in the same cycle.\\
+$\bullet$ Use this mode when checking a victim line before writeback.\\[0.15em]} \\
+\hline
+Access Write \newline (\texttt{comp=0, write=1}) &
+Cache-line fill from memory &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ \texttt{index}, \texttt{offset}, \texttt{tag\_in}, \texttt{valid\_in}, and \texttt{data\_in} must be valid.\\
+$\bullet$ At the rising edge, the cache writes the incoming data and tag.\\
+$\bullet$ The valid bit is set.\\
+$\bullet$ The dirty bit is cleared to 0.\\[0.15em]} \\
+\hline
+\end{tabular}
+\endgroup
+\end{center}
 
 \subsection*{Two-Way Set-Associative Cache}
 
@@ -453,6 +479,55 @@ in directory:
 
 Two cache modules are instantiated, and hit detection is performed across both ways.
 
+\subsection*{Signal Interactions}
+
+When \texttt{enable} is high, the two-way set-associative cache still uses the
+\texttt{comp} and \texttt{write} control signals, but now both cache ways must
+be coordinated correctly.
+
+\begin{center}
+\begingroup
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.06}
+\begin{tabular}{|p{3.2cm}|p{3.2cm}|p{7.2cm}|}
+\hline
+\textbf{Mode} & \textbf{When Used} & \textbf{Behavior} \\
+\hline
+Compare Read \newline (\texttt{comp=1, write=0}) &
+Load instructions &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ Drive \texttt{index} and \texttt{offset} to both cache modules.\\
+$\bullet$ A hit occurs if either hit output is high.\\
+$\bullet$ Use the hit result to select the correct \texttt{data\_out}.\\
+$\bullet$ On a miss, choose a victim way: invalid way first, way 0 if both are invalid, otherwise use the pseudo-random policy.\\[0.15em]} \\
+\hline
+Compare Write \newline (\texttt{comp=1, write=1}) &
+Store instructions &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ Drive \texttt{index}, \texttt{offset}, and \texttt{data\_in} to both cache modules.\\
+$\bullet$ A hit occurs if either hit output is high.\\
+$\bullet$ Only one cache module should write on a hit.\\
+$\bullet$ Your control logic must ensure the same line is never present in both ways.\\[0.15em]} \\
+\hline
+Access Read \newline (\texttt{comp=0, write=0}) &
+Victim inspection / writeback preparation &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ After choosing the victim way, use that select signal to mux the outputs.\\
+$\bullet$ Read \texttt{data\_out}, \texttt{valid}, and \texttt{dirty} from the selected way.\\
+$\bullet$ Use this mode when checking whether the chosen victim must be written back.\\[0.15em]} \\
+\hline
+Access Write \newline (\texttt{comp=0, write=1}) &
+Cache-line fill from memory &
+\parbox[t]{\linewidth}{\raggedright
+$\bullet$ Drive \texttt{index}, \texttt{offset}, \texttt{data\_in}, and \texttt{valid\_in} to both cache modules.\\
+$\bullet$ Assert write only for the selected way.\\
+$\bullet$ Fill the chosen cache way without modifying the other one.\\[0.15em]} \\
+\hline
+\end{tabular}
+\endgroup
+\end{center}
+
 \subsection*{Replacement Policy}
 
 To ensure deterministic grading, you must implement the following pseudo-random replacement policy.
@@ -462,29 +537,48 @@ To ensure deterministic grading, you must implement the following pseudo-random 
 \item Initialize \texttt{victimway} to zero.
 \item On each cache read or write, invert \texttt{victimway}.
 \item If both cache ways are valid during replacement, select the way indicated by \texttt{victimway}.
-\item If one way is invalid, install in the invalid way.
+\item If one way in the indexed set is invalid, place the new block in that invalid way instead of evicting a valid block. Don't evict unless the set is full.
 \end{enumerate}
 
-\subsection*{Submission}
+\subsection*{Testing}
 
-Use the standard submission wrapper:
+Use the project test wrapper for this follow-on phase:
 \begin{quote}
-\texttt{./run build\_submission project phase\_2}
+\texttt{./run test project phase\_2\_3}
+\end{quote}
+By default, this runs \textbf{both} cache implementations (direct-mapped and two-way associative).
+
+To run only one cache implementation within Phase 2.3, use:
+\begin{quote}
+\texttt{./run test project phase\_2\_3 -direct -only}
+\end{quote}
+\begin{quote}
+\texttt{./run test project phase\_2\_3 -associative -only}
 \end{quote}
 
-The generated submission zip is written to:
+Verbose mode / targeted debugging:
 \begin{quote}
-\texttt{./generated\_turnins/project\_phase\_2/}
+\texttt{./run test -v project phase\_2\_3 [subtest]}
 \end{quote}
 
-Your Phase 2.3 work must be present in:
+\subsection*{Synthesis}
+You will need to run synthesis on both your direct-mapped and set-associative caches and verify that neither produces any errors. You should turn in all of the reports generated by synthesis.
+
+Your synthesis results should be placed in these directories:
 \begin{quote}
 \texttt{./demo2/verilog/phase2\_3/cache\_direct/}
 
 \texttt{./demo2/verilog/phase2\_3/cache\_assoc/}
 \end{quote}
 
-Required artifacts include:
+For Phase 2.3, your work must be present in:
+\begin{quote}
+\texttt{./demo2/verilog/phase2\_3/cache\_direct/}
+
+\texttt{./demo2/verilog/phase2\_3/cache\_assoc/}
+\end{quote}
+
+Required artifacts for the cache demo include:
 
 \begin{itemize}
 \item Your cache controller state diagram (\texttt{state\_machine.pdf})
@@ -496,5 +590,34 @@ Place \texttt{state\_machine.pdf} in:
 \begin{quote}
 \texttt{./demo2/writeup/state\_machine.pdf}
 \end{quote}
+
+\section*{Submission}
+
+Use the phase-specific submission wrappers:
+\begin{quote}
+\texttt{./run build\_submission project phase\_2}
+
+\texttt{./run build\_submission project phase\_2\_1}
+
+\texttt{./run build\_submission project phase\_2\_2}
+
+\texttt{./run build\_submission project phase\_2\_3}
+\end{quote}
+
+Each command packages the expected files for that phase and produces a submission zip for upload.
+
+Generated submission zips are written to the corresponding turnin directories:
+\begin{quote}
+\texttt{./generated\_turnins/project\_phase\_2/}
+
+\texttt{./generated\_turnins/project\_phase\_2\_1/}
+
+\texttt{./generated\_turnins/project\_phase\_2\_2/}
+
+\texttt{./generated\_turnins/project\_phase\_2\_3/}
+\end{quote}
+
+Upload the generated zip file to the corresponding Phase 2 Gradescope assignment.
+
 
 \end{document}

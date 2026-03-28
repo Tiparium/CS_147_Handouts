@@ -29,6 +29,7 @@ fi
 assignment="$1"; shift
 subproblem="${1:-}"
 subtest="${2:-}"
+project_args=("$@")
 
 normalize_assignment() {
   local name="$1"
@@ -452,18 +453,175 @@ run_assignment() {
   done
 }
 
+run_project_phase2_cache() {
+  local phase="$1"; shift
+  local out_root="$1"; shift
+  local action="${1:-}"
+  shift || true
+  local chained="${PHASE23_CHAINED:-0}"
+
+  if [ "$action" = "list" ]; then
+    echo "1. Direct-mapped cache benches"
+    echo "   - direct_perfbench"
+    echo "   - direct_randbench"
+    echo "2. Two-way associative cache benches"
+    echo "   - associative_perfbench"
+    echo "   - associative_randbench"
+    return
+  fi
+
+  local impl_filter="both"
+  local only_mode=0
+  local target_subtest=""
+  local extra
+  for extra in "$action" "$@"; do
+    [ -n "$extra" ] || continue
+    case "$extra" in
+      -direct) impl_filter="direct" ;;
+      -associative) impl_filter="associative" ;;
+      -only) only_mode=1 ;;
+      *) target_subtest="$extra" ;;
+    esac
+  done
+
+  local summary_all_jsonl="$out_root/$phase/summary_all.jsonl"
+  mkdir -p "$out_root/$phase"
+  if [ "$chained" -ne 1 ]; then
+    : > "$summary_all_jsonl"
+  fi
+
+  local -a tests=()
+  if [ "$impl_filter" = "both" ] || [ "$impl_filter" = "direct" ]; then
+    tests+=("direct|perfbench|cache_direct|mem_system_perfbench|mem.addr")
+    tests+=("direct|randbench|cache_direct|mem_system_randbench|")
+  fi
+  if [ "$impl_filter" = "both" ] || [ "$impl_filter" = "associative" ]; then
+    tests+=("associative|perfbench|cache_assoc|mem_system_perfbench|mem.addr")
+    tests+=("associative|randbench|cache_assoc|mem_system_randbench|")
+  fi
+
+  if [ -n "$target_subtest" ]; then
+    local -a filtered=()
+    local entry impl bench key
+    for entry in "${tests[@]}"; do
+      IFS='|' read -r impl bench _rest <<<"$entry"
+      key="${impl}_${bench}"
+      if [ "$target_subtest" = "$bench" ] || [ "$target_subtest" = "$key" ]; then
+        filtered+=("$entry")
+      fi
+    done
+    tests=("${filtered[@]}")
+  fi
+
+  if [ "${#tests[@]}" -eq 0 ]; then
+    echo "No Phase 2.3 tests matched the requested selection." >&2
+    overall_status=1
+    return
+  fi
+
+  if [ "$only_mode" -eq 1 ] && [ "$impl_filter" = "both" ]; then
+    echo "Phase 2.3 flag error: -only requires -direct or -associative." >&2
+    overall_status=1
+    return
+  fi
+
+  local supplied_total=0
+  local supplied_pass=0
+  local supplied_fail=0
+  local entry impl bench suite_dir tb_top addr_file test_name test_dir log_file status
+  for entry in "${tests[@]}"; do
+    IFS='|' read -r impl bench suite_dir tb_top addr_file <<<"$entry"
+    test_name="${impl}_${bench}"
+    test_dir="$out_root/$phase/$test_name"
+    mkdir -p "$test_dir"
+    log_file="$test_dir/run.log"
+
+    echo "[GROUP] Phase 2.3 ${impl} cache"
+    echo "  [RUN] $test_name"
+
+    set +e
+    if [ -n "$addr_file" ]; then
+      (
+        cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
+        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" *.v >"$log_file" 2>&1 && \
+        vvp "$test_dir/simv" +addr_trace_file_name="$addr_file" >>"$log_file" 2>&1
+      )
+    else
+      (
+        cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
+        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" *.v >"$log_file" 2>&1 && \
+        vvp "$test_dir/simv" >>"$log_file" 2>&1
+      )
+    fi
+    rc=$?
+    set -e
+
+    status="FAIL"
+    if [ "$rc" -eq 0 ] && grep -q "Test status: SUCCESS" "$log_file"; then
+      status="PASS"
+    fi
+
+    if [ "$VERBOSE" -eq 1 ]; then
+      cat "$log_file"
+    fi
+
+    supplied_total=$((supplied_total + 1))
+    if [ "$status" = "PASS" ]; then
+      supplied_pass=$((supplied_pass + 1))
+      echo "[PASS] $test_name"
+    else
+      supplied_fail=$((supplied_fail + 1))
+      echo "[FAIL] $test_name"
+      overall_status=1
+    fi
+
+    python3 - <<'PY' "$summary_all_jsonl" "$test_name" "$status" "$impl" "$bench"
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+obj = {
+    "test": sys.argv[2],
+    "status": sys.argv[3],
+    "implementation": sys.argv[4],
+    "bench": sys.argv[5],
+    "category": "supplied",
+    "group": f"{sys.argv[4]}_{sys.argv[5]}",
+    "group_label": f"Phase 2.3 {sys.argv[4]} cache",
+    "bucket": "specialized",
+}
+with path.open("a") as f:
+    f.write(json.dumps(obj) + "\n")
+PY
+  done
+
+  if [ "$chained" -ne 1 ]; then
+    echo "[SUMMARY] supplied tests: ${supplied_total}  passed: ${supplied_pass}  failed: ${supplied_fail}"
+    echo "[SUMMARY] student tests:  0  passed: 0  failed: 0"
+    echo "[SUMMARY] scored tests: supplied only"
+  fi
+}
+
 run_project() {
   local phase="${1:-}"
-  local action="${2:-}"
-  local internal="${3:-0}"
+  shift || true
+  local internal="${INTERNAL:-0}"
   local project_root="$ASSIGN_ROOT/project"
   local project_wsrun="$project_root/wsrun_iverilog.sh"
   local test_root="$project_root/testprograms/public"
   local out_root="$project_root/.wsrun_out"
   local tb=""
   local demo_dir=""
+  local baseline_phase2_official_dirs=(inst_tests complex_demo1 rand_simple rand_complex rand_ctrl rand_mem complex_demo2)
+  local final_phase3_official_dirs=(perf complex_demofinal rand_final rand_ldst rand_idcache rand_icache rand_dcache complex_demo1 complex_demo2 rand_complex rand_ctrl inst_tests)
   local list_dirs=()
   local summary_jsonl=""
+  local -a wsrun_flags=()
+  local action="${1:-}"
+  local -a extra_args=()
+  local phase23_prepend_cache=0
+  if [ $# -gt 0 ]; then
+    shift || true
+    extra_args=("$@")
+  fi
   emit_internal_group() {
     local key="$1"
     local label="$2"
@@ -487,10 +645,47 @@ print(json.dumps({
 }, indent=2))
 PY
   }
+  project_phase_student_custom_required() {
+    case "$phase" in
+      phase_2|phase_2_1|phase_2_2|phase_2_3|phase_3) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  phase23_after_student_custom() {
+    [ "$phase23_prepend_cache" -eq 1 ] && [ "$1" = "student_custom" ]
+  }
+  emit_project_student_custom_checkboxes() {
+    local configured_count="${1:-0}"
+    local passing_count="${2:-0}"
+    local slot mark
+    for slot in 1 2; do
+      mark=" "
+      if [ "$configured_count" -ge "$slot" ] && [ "$passing_count" -ge "$slot" ]; then
+        mark="x"
+      fi
+      printf "  [%s] Required student test %d configured and passing\n" "$mark" "$slot"
+    done
+  }
+  group_bucket_for_dir() {
+    local d="$1"
+    case "$d" in
+      student_custom) printf "%s\n" "student_custom" ;;
+      inst_tests_unaligned|complex_demo2_stall) printf "%s\n" "specialized" ;;
+      *) printf "%s\n" "baseline" ;;
+    esac
+  }
   list_file_for_dir() {
     local d="$1"
     if [ "$d" = "student_custom" ]; then
-      printf "%s\n" "$project_root/testprograms/student_custom/all.list"
+      case "$phase" in
+        phase_2|phase_2_1|phase_2_2|phase_2_3) printf "%s\n" "$project_root/testprograms/student_custom/all_phase_2.list" ;;
+        phase_3) printf "%s\n" "$project_root/testprograms/student_custom/all_phase_3.list" ;;
+        *) printf "%s\n" "$project_root/testprograms/student_custom/all_phase_1.list" ;;
+      esac
+    elif [ "$d" = "inst_tests_unaligned" ]; then
+      printf "%s\n" "$out_root/$phase/.generated_unaligned.list"
+    elif [ "$d" = "complex_demo2_stall" ]; then
+      printf "%s\n" "$test_root/complex_demo2/all.list"
     else
       printf "%s\n" "$test_root/$d/all.list"
     fi
@@ -517,9 +712,42 @@ PY
       demo_dir="$project_root/demo1/verilog"
       list_dirs=(student_custom inst_tests complex_demo1 rand_simple rand_complex rand_ctrl rand_mem)
       ;;
-    phase_2|phase_3)
-      echo "[project] $phase tests are not wired yet."
-      return
+    phase_2)
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo2/verilog"
+      list_dirs=(student_custom "${baseline_phase2_official_dirs[@]}")
+      wsrun_flags=(-pipe)
+      ;;
+    phase_2_1)
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo2/verilog"
+      list_dirs=(student_custom inst_tests_unaligned "${baseline_phase2_official_dirs[@]}")
+      wsrun_flags=(-pipe -align)
+      ;;
+    phase_2_2)
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo2/verilog"
+      list_dirs=(student_custom complex_demo2_stall "${baseline_phase2_official_dirs[@]}")
+      wsrun_flags=(-pipe -align)
+      ;;
+    phase_2_3)
+      case "$action" in
+        -direct|-associative|-only|direct_perfbench|direct_randbench|associative_perfbench|associative_randbench|perfbench|randbench)
+          run_project_phase2_cache "$phase" "$out_root" "$action" "${extra_args[@]}"
+          return
+          ;;
+      esac
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo2/verilog"
+      list_dirs=(student_custom "${baseline_phase2_official_dirs[@]}")
+      wsrun_flags=(-pipe)
+      phase23_prepend_cache=1
+      ;;
+    phase_3)
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo3/verilog"
+      list_dirs=(student_custom "${final_phase3_official_dirs[@]}")
+      wsrun_flags=(-pipe -align)
       ;;
     "")
       echo "Usage: ./run test project phase_1 [list|<test>] or ./run test project [phase]" >&2
@@ -548,6 +776,11 @@ PY
   # Ensure per-phase output directory exists before writing summary artifacts.
   mkdir -p "$out_root/$phase"
 
+  if [ "$phase" = "phase_2_1" ]; then
+    unaligned_list="$out_root/$phase/.generated_unaligned.list"
+    find "$project_root/testprograms/public/inst_tests/unaligned" -maxdepth 1 -type f -name "*.asm" | sort > "$unaligned_list"
+  fi
+
   if [ "$action" = "list" ]; then
     # Group by test categories instead of listing individual .asm files.
     simple_dir="inst_tests"
@@ -555,29 +788,90 @@ PY
     rand_dirs=(rand_simple rand_complex rand_ctrl rand_mem)
     custom_dir="student_custom"
 
-    if [ -f "$(list_file_for_dir "$custom_dir")" ]; then
+    if [ "$phase" = "phase_2_1" ]; then
       echo "1. Student custom tests"
-      echo "   - $custom_dir"
+      echo "   - student_custom"
+      echo "2. Unaligned access tests"
+      echo "   - inst_tests_unaligned"
+      echo "3. Phase 2 baseline"
+    elif [ "$phase" = "phase_2_2" ]; then
+      echo "1. Student custom tests"
+      echo "   - student_custom"
+      echo "2. Stalling memory tests"
+      echo "   - complex_demo2_stall"
+      echo "3. Phase 2 baseline"
+    elif [ "$phase" = "phase_2_3" ]; then
+      echo "1. Student custom tests"
+      echo "   - student_custom"
+      echo "2. Direct-mapped cache benches"
+      echo "   - direct_perfbench"
+      echo "   - direct_randbench"
+      echo "3. Two-way associative cache benches"
+      echo "   - associative_perfbench"
+      echo "   - associative_randbench"
+      echo "4. Phase 2 baseline"
+    elif [ "$phase" = "phase_3" ]; then
+      echo "1. Student custom tests"
+      echo "   - student_custom"
+      echo "2. Final verification suite"
+    fi
+    if [ -f "$(list_file_for_dir "$custom_dir")" ]; then
+      if [ "$phase" = "phase_2" ]; then
+        echo "1. Student custom tests"
+        echo "   - $custom_dir"
+      fi
     else
-      echo "1. Student custom tests (missing list)" >&2
+      if [ "$phase" = "phase_2" ]; then
+        echo "1. Student custom tests (missing list)" >&2
+      elif [ "$phase" = "phase_3" ]; then
+        echo "1. Student custom tests (missing list)" >&2
+      fi
       overall_status=1
     fi
 
+    if [ "$phase" = "phase_3" ]; then
+      for d in "${final_phase3_official_dirs[@]}"; do
+        if [ -f "$(list_file_for_dir "$d")" ]; then
+          echo "   - $d"
+        else
+          echo "   - $d (missing list)" >&2
+          overall_status=1
+        fi
+      done
+      return
+    fi
+
     if [ -f "$(list_file_for_dir "$simple_dir")" ]; then
-      echo "2. Simple instruction tests"
+      if [ "$phase" = "phase_2" ]; then
+        echo "2. Simple instruction tests"
+      fi
+      echo "   - inst_tests"
     else
-      echo "2. Simple instruction tests (missing list)" >&2
+      if [ "$phase" = "phase_2" ]; then
+        echo "2. Simple instruction tests (missing list)" >&2
+      else
+        echo "   - inst_tests (missing list)" >&2
+      fi
       overall_status=1
     fi
 
     if [ -f "$(list_file_for_dir "$complex_dir")" ]; then
-      echo "3. Complex tests for demo1"
+      if [ "$phase" = "phase_2" ]; then
+        echo "3. Complex tests for demo1"
+      fi
+      echo "   - complex_demo1"
     else
-      echo "3. Complex tests for demo1 (missing list)" >&2
+      if [ "$phase" = "phase_2" ]; then
+        echo "3. Complex tests for demo1 (missing list)" >&2
+      else
+        echo "   - complex_demo1 (missing list)" >&2
+      fi
       overall_status=1
     fi
 
-    echo "4. Random tests for demo1"
+    if [ "$phase" = "phase_2" ]; then
+      echo "4. Random tests for demo1"
+    fi
     for d in "${rand_dirs[@]}"; do
       if [ -f "$(list_file_for_dir "$d")" ]; then
         echo "   - $d"
@@ -586,6 +880,19 @@ PY
         overall_status=1
       fi
     done
+    if [ -f "$(list_file_for_dir "complex_demo2")" ]; then
+      if [ "$phase" = "phase_2" ]; then
+        echo "5. Random/complex tests for demo2"
+      fi
+      echo "   - complex_demo2"
+    else
+      if [ "$phase" = "phase_2" ]; then
+        echo "5. Random/complex tests for demo2 (missing list)" >&2
+      else
+        echo "   - complex_demo2 (missing list)" >&2
+      fi
+      overall_status=1
+    fi
     return
   fi
 
@@ -610,7 +917,10 @@ PY
           is_list_entry "$line" || continue
           base="${line##*/}"
           if [ "$base" = "$test_name" ]; then
-            found="$(dirname "$list_file")/$test_name"
+            case "$line" in
+              /*) found="$line" ;;
+              *) found="$(dirname "$list_file")/$test_name" ;;
+            esac
             break
           fi
         done < "$list_file"
@@ -623,6 +933,9 @@ PY
       fi
       justtimer_total=1
     else
+      if [ "$phase23_prepend_cache" -eq 1 ]; then
+        justtimer_total=$((justtimer_total + 4))
+      fi
       for d in "${list_dirs[@]}"; do
         list_file="$(list_file_for_dir "$d")"
         [ -f "$list_file" ] || continue
@@ -665,15 +978,70 @@ PY
     else
       for d in "${list_dirs[@]}"; do
         list_file="$(list_file_for_dir "$d")"
+        group_count=0
+        if [ -f "$list_file" ]; then
+          group_count="$(awk '!/^[[:space:]]*($|#)/{c++} END{print c+0}' "$list_file" 2>/dev/null || true)"
+        fi
         case "$d" in
           inst_tests) group_label="Simple instruction tests" ;;
           complex_demo1) group_label="Complex tests for demo1" ;;
+          complex_demo2_stall) group_label="Stalling memory tests" ;;
+          inst_tests_unaligned) group_label="Unaligned access tests" ;;
           rand_simple|rand_complex|rand_ctrl|rand_mem) group_label="Random tests for demo1 ($d)" ;;
+          perf) group_label="Performance tests" ;;
+          complex_demofinal) group_label="Final complex tests" ;;
+          rand_final) group_label="Final random tests" ;;
+          rand_ldst) group_label="Random load/store tests" ;;
+          rand_idcache) group_label="Random instruction/data cache tests" ;;
+          rand_icache) group_label="Random instruction cache tests" ;;
+          rand_dcache) group_label="Random data cache tests" ;;
           student_custom) group_label="Student custom tests" ;;
           *) group_label="$d" ;;
         esac
+        spinner_pause
         echo "[GROUP] $group_label"
         if [ ! -f "$list_file" ]; then
+          if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+            emit_project_student_custom_checkboxes 0 0
+            echo ""
+          fi
+          if phase23_after_student_custom "$d"; then
+            spinner_pause
+            echo "[GROUP] Phase 2.3 cache benches"
+            for name in direct_perfbench direct_randbench associative_perfbench associative_randbench; do
+              sleep 0.2
+              justtimer_index=$((justtimer_index + 1))
+              spinner_label="Running test suite (${justtimer_index}/${justtimer_total}, failed: 0)"
+              if [ -n "$spinner_label_file" ]; then
+                printf "%s" "$spinner_label" > "$spinner_label_file" 2>/dev/null || true
+              fi
+              printf "  [SKIP] %-15s | [ERRORS] total: N/A*   asm: N/A*  cmp: N/A*  sim: N/A* diff: N/A*   vcheck: N/A*\n" "$name"
+            done
+            spinner_resume
+            echo ""
+          fi
+          spinner_resume
+          continue
+        fi
+        if [ "$group_count" -eq 0 ] && [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
+          echo ""
+          if phase23_after_student_custom "$d"; then
+            spinner_pause
+            echo "[GROUP] Phase 2.3 cache benches"
+            for name in direct_perfbench direct_randbench associative_perfbench associative_randbench; do
+              sleep 0.2
+              justtimer_index=$((justtimer_index + 1))
+              spinner_label="Running test suite (${justtimer_index}/${justtimer_total}, failed: 0)"
+              if [ -n "$spinner_label_file" ]; then
+                printf "%s" "$spinner_label" > "$spinner_label_file" 2>/dev/null || true
+              fi
+              printf "  [SKIP] %-15s | [ERRORS] total: N/A*   asm: N/A*  cmp: N/A*  sim: N/A* diff: N/A*   vcheck: N/A*\n" "$name"
+            done
+            spinner_resume
+            echo ""
+          fi
+          spinner_resume
           continue
         fi
         while IFS= read -r line; do
@@ -691,6 +1059,21 @@ PY
           spinner_resume
         done < "$list_file"
         echo ""
+        if phase23_after_student_custom "$d"; then
+          spinner_pause
+          echo "[GROUP] Phase 2.3 cache benches"
+          for name in direct_perfbench direct_randbench associative_perfbench associative_randbench; do
+            sleep 0.2
+            justtimer_index=$((justtimer_index + 1))
+            spinner_label="Running test suite (${justtimer_index}/${justtimer_total}, failed: 0)"
+            if [ -n "$spinner_label_file" ]; then
+              printf "%s" "$spinner_label" > "$spinner_label_file" 2>/dev/null || true
+            fi
+            printf "  [SKIP] %-15s | [ERRORS] total: N/A*   asm: N/A*  cmp: N/A*  sim: N/A* diff: N/A*   vcheck: N/A*\n" "$name"
+          done
+          spinner_resume
+          echo ""
+        fi
       done
     fi
 
@@ -716,7 +1099,10 @@ PY
         is_list_entry "$line" || continue
         base="${line##*/}"
         if [ "$base" = "$test_name" ]; then
-          found="$(dirname "$list_file")/$test_name"
+          case "$line" in
+            /*) found="$line" ;;
+            *) found="$(dirname "$list_file")/$test_name" ;;
+          esac
           break
         fi
       done < "$list_file"
@@ -731,9 +1117,10 @@ PY
     summary_jsonl="$out_root/$phase/summary.jsonl"
     name_width="${#test_name}"
     WSRUN_STREAM=$([ "$internal" -eq 1 ] && echo "json_pretty" || echo "pretty") \
-      WSRUN_SPINNER=1 WSRUN_SPINNER_SCOPE=run WSRUN_NAME_WIDTH="$name_width" \
+      WSRUN_SPINNER=0 WSRUN_SPINNER_SCOPE=run WSRUN_NAME_WIDTH="$name_width" \
       WSRUN_VERBOSE="$VERBOSE" \
-      "$project_wsrun" -outdir "$out_root/$phase" -prog "$found" "$tb" "$demo_dir"/*.v
+      WSRUN_PHASE="$phase" \
+      "$project_wsrun" "${wsrun_flags[@]}" -outdir "$out_root/$phase" -prog "$found" "$tb" "$demo_dir"/*.v
     rc=$?
     if [ "$rc" -ne 0 ]; then
       overall_status=1
@@ -781,6 +1168,46 @@ PY
   supplied_phase_total=0
   student_phase_total=0
   max_name_len=0
+  refresh_phase23_cache_totals() {
+    [ "$phase23_prepend_cache" -eq 1 ] || return 0
+    [ -f "$summary_all_jsonl" ] || return 0
+    local refreshed
+    refreshed="$(python3 - <<'PY' "$summary_all_jsonl"
+import json,sys
+supplied_total=0
+supplied_pass=0
+supplied_fail=0
+for line in open(sys.argv[1]):
+    line=line.strip()
+    if not line:
+        continue
+    try:
+        obj=json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if obj.get("bucket") != "specialized":
+        continue
+    if not str(obj.get("group", "")).startswith(("direct_", "associative_")):
+        continue
+    supplied_total += 1
+    if obj.get("status") == "PASS":
+        supplied_pass += 1
+    else:
+        supplied_fail += 1
+print(supplied_total, supplied_pass, supplied_fail)
+PY
+)"
+    read -r supplied_total supplied_pass supplied_fail <<< "$refreshed"
+    supplied_done_count="$supplied_total"
+    supplied_fail_count="$supplied_fail"
+  }
+  if [ "$phase23_prepend_cache" -eq 1 ]; then
+    phase_total=$((phase_total + 4))
+    supplied_phase_total=$((supplied_phase_total + 4))
+    if [ 21 -gt "$max_name_len" ]; then
+      max_name_len=21
+    fi
+  fi
   for d in "${list_dirs[@]}"; do
     list_file="$(list_file_for_dir "$d")"
     [ -f "$list_file" ] || continue
@@ -814,7 +1241,16 @@ PY
     case "$d" in
       inst_tests) group_label="Simple instruction tests" ;;
       complex_demo1) group_label="Complex tests for demo1" ;;
+      complex_demo2_stall) group_label="Stalling memory tests" ;;
+      inst_tests_unaligned) group_label="Unaligned access tests" ;;
       rand_simple|rand_complex|rand_ctrl|rand_mem) group_label="Random tests for demo1 ($d)" ;;
+      perf) group_label="Performance tests" ;;
+      complex_demofinal) group_label="Final complex tests" ;;
+      rand_final) group_label="Final random tests" ;;
+      rand_ldst) group_label="Random load/store tests" ;;
+      rand_idcache) group_label="Random instruction/data cache tests" ;;
+      rand_icache) group_label="Random instruction cache tests" ;;
+      rand_dcache) group_label="Random data cache tests" ;;
       student_custom) group_label="Student custom tests" ;;
       *) group_label="$d" ;;
     esac
@@ -825,14 +1261,29 @@ PY
     fi
     if [ ! -f "$list_file" ]; then
       if [ "$internal" -eq 0 ]; then
+        if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
+        fi
         echo ""
+      fi
+      if phase23_after_student_custom "$d"; then
+        PHASE23_CHAINED=1 run_project_phase2_cache "$phase" "$out_root"
+        refresh_phase23_cache_totals
       fi
       continue
     fi
     if [ "${group_count:-0}" -eq 0 ]; then
       if [ "$internal" -eq 0 ]; then
-        echo "  [INFO] No tests configured."
+        if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
+        else
+          echo "  [INFO] No tests configured."
+        fi
         echo ""
+      fi
+      if phase23_after_student_custom "$d"; then
+        PHASE23_CHAINED=1 run_project_phase2_cache "$phase" "$out_root"
+        refresh_phase23_cache_totals
       fi
       continue
     fi
@@ -849,13 +1300,15 @@ PY
       spinner_label="Running student tests"
     fi
     WSRUN_STREAM=$([ "$internal" -eq 1 ] && echo "json_pretty" || echo "pretty") \
-      WSRUN_SPINNER=1 WSRUN_SPINNER_SCOPE=run WSRUN_NAME_WIDTH="$max_name_len" \
+      WSRUN_SPINNER=0 WSRUN_SPINNER_SCOPE=run WSRUN_NAME_WIDTH="$max_name_len" \
       WSRUN_VERBOSE="$VERBOSE" WSRUN_PHASE="$phase" WSRUN_LINE_PREFIX="  " \
       WSRUN_SUMMARY_JSONL="$group_summary_jsonl" WSRUN_SUMMARY_APPEND=1 \
+      WSRUN_CATEGORY=$([ "$d" = "student_custom" ] && echo "student_custom" || echo "supplied") \
+      WSRUN_GROUP_KEY="$d" WSRUN_GROUP_LABEL="$group_label" WSRUN_BUCKET="$(group_bucket_for_dir "$d")" \
       WSRUN_TOTAL_TESTS="$spinner_total" WSRUN_INDEX_OFFSET="$spinner_offset" WSRUN_FAIL_BASE="$spinner_fail_base" \
       WSRUN_SPINNER_LABEL_PREFIX="$spinner_label" \
       WSRUN_SPINNER_START_TS="$suite_start_ts" \
-      "$project_wsrun" -outdir "$out_root/$phase" -list "$list_file" "$tb" "$demo_dir"/*.v
+      "$project_wsrun" "${wsrun_flags[@]}" -outdir "$out_root/$phase" -list "$list_file" "$tb" "$demo_dir"/*.v
     rc=$?
     if [ "$rc" -ne 0 ]; then
       overall_status=1
@@ -894,6 +1347,13 @@ PY
       student_fail=$((student_fail + g_fail))
       student_done_count=$((student_done_count + g_total))
       student_fail_count=$((student_fail_count + g_fail))
+      if [ "$internal" -eq 0 ] && project_phase_student_custom_required; then
+        emit_project_student_custom_checkboxes "$g_total" "$g_pass"
+      fi
+      if phase23_after_student_custom "$d"; then
+        PHASE23_CHAINED=1 run_project_phase2_cache "$phase" "$out_root"
+        refresh_phase23_cache_totals
+      fi
     else
       supplied_total=$((supplied_total + g_total))
       supplied_pass=$((supplied_pass + g_pass))
@@ -927,6 +1387,9 @@ PY
       echo "[SUMMARY] supplied tests: ${supplied_total}  passed: ${supplied_pass}  failed: ${supplied_fail}"
       echo "[SUMMARY] student tests:  ${student_total}  passed: ${student_pass}  failed: ${student_fail}"
       echo "[SUMMARY] scored tests: supplied only"
+      if [ "${PROJECT_AUTOGRADER_PENDING:-0}" = "1" ]; then
+        echo "[INFO] Autograder is running..."
+      fi
     fi
   elif [ "$internal" -eq 1 ]; then
     emit_internal_summary "$supplied_total" "$supplied_pass" "$supplied_fail" "$student_total" "$student_pass" "$student_fail"
@@ -967,7 +1430,7 @@ else
       echo "       Doing so will cause the testing run to break."
     elif [ -z "$subtest" ]; then
       case "$subproblem" in
-        phase_1|phase_2|phase_3)
+        phase_1|phase_2|phase_2_1|phase_2_2|phase_2_3|phase_3)
           echo "[NOTE] '*' indicates error count is not comprehensive, because some tests could not be run."
           echo "[WARN] Project test suite may take a significant amount of time to run."
           echo "       It is safe to abort this process (via ctrl + c),"
@@ -980,20 +1443,29 @@ else
     echo "============================================================"
     if [ -z "$subproblem" ]; then
       echo "[ASSIGNMENT] project: Phase 1"
-      run_project "phase_1" "" "$INTERNAL"
+      run_project "phase_1"
       echo "[ASSIGNMENT] project: Phase 2"
-      run_project "phase_2" "" "$INTERNAL"
+      run_project "phase_2"
+      echo "[ASSIGNMENT] project: Phase 2.1"
+      run_project "phase_2_1"
+      echo "[ASSIGNMENT] project: Phase 2.2"
+      run_project "phase_2_2"
+      echo "[ASSIGNMENT] project: Phase 2.3"
+      run_project "phase_2_3"
       echo "[ASSIGNMENT] project: Phase 3"
-      run_project "phase_3" "" "$INTERNAL"
+      run_project "phase_3"
     else
       case "$subproblem" in
         phase_1) phase_label="Phase 1" ;;
         phase_2) phase_label="Phase 2" ;;
+        phase_2_1) phase_label="Phase 2.1" ;;
+        phase_2_2) phase_label="Phase 2.2" ;;
+        phase_2_3) phase_label="Phase 2.3" ;;
         phase_3) phase_label="Phase 3" ;;
         *) phase_label="$subproblem" ;;
       esac
       echo "[ASSIGNMENT] project: $phase_label"
-      run_project "$subproblem" "$subtest" "$INTERNAL"
+      run_project "${project_args[@]}"
     fi
   else
     assignment="$(normalize_assignment "$assignment")"
