@@ -16,9 +16,10 @@ case "$PROJECT_PHASE_RAW" in
   phase2_1|phase_2_1|2_1) PROJECT_PHASE="phase_2_1" ;;
   phase2_2|phase_2_2|2_2) PROJECT_PHASE="phase_2_2" ;;
   phase2_3|phase_2_3|2_3) PROJECT_PHASE="phase_2_3" ;;
+  phase3|phase_3|3) PROJECT_PHASE="phase_3" ;;
   *)
     echo "[submit] Unsupported project phase: $PROJECT_PHASE_RAW" >&2
-    echo "[submit] Supported: phase_1, phase_2, phase_2_1, phase_2_2, phase_2_3" >&2
+    echo "[submit] Supported: phase_1, phase_2, phase_2_1, phase_2_2, phase_2_3, phase_3" >&2
     exit 1
     ;;
 esac
@@ -36,24 +37,40 @@ case "$PROJECT_PHASE" in
     turnin_slug="project_${PROJECT_PHASE}"
     grader_copy_dir="$ASSIGNMENT_DIR/demo2/Autograders/Gradescope_Autograder_Template_${PROJECT_PHASE}/test_submissions"
     ;;
+  phase_3)
+    demo_name="demo3"
+    summary_name="project_phase_3_grade_summary.json"
+    turnin_slug="project_phase_3"
+    grader_copy_dir="$ASSIGNMENT_DIR/demo3/Gradescope_Autograder_Template/test_submissions"
+    ;;
 esac
 
 REPORT_LOG="$ASSIGNMENT_DIR/submission_report.log"
 REPORT_VERBOSE="$ASSIGNMENT_DIR/submission_report_verbose.log"
+REPORT_LOG_TMP="$ASSIGNMENT_DIR/.submission_report.log.tmp"
+REPORT_VERBOSE_TMP="$ASSIGNMENT_DIR/.submission_report_verbose.log.tmp"
 SUMMARY_JSON="$ASSIGNMENT_DIR/$summary_name"
 MARKER="$ASSIGNMENT_DIR/.last_submit_zip"
 TURNIN_DIR="$TURNINS_ROOT/$turnin_slug"
 SUB_BASENAME="${turnin_slug}_${STUDENT_NAME}_submission"
 
 mkdir -p "$ASSIGNMENT_DIR"
+rm -f "$REPORT_LOG" "$REPORT_VERBOSE" "$REPORT_LOG_TMP" "$REPORT_VERBOSE_TMP"
 
 set +e
 (
   cd "$ASSIGNMENTS_ROOT"
-  bash -lc "set -o pipefail; PROJECT_AUTOGRADER_PENDING=1 ./.testing/test_runner.sh project $PROJECT_PHASE | tee \"$REPORT_LOG\""
+  bash -lc "set -o pipefail; PROJECT_AUTOGRADER_PENDING=1 ./.testing/test_runner.sh project $PROJECT_PHASE | tee \"$REPORT_LOG_TMP\""
 )
 test_rc=$?
 set -e
+if [ -f "$REPORT_LOG_TMP" ]; then
+  mv -f "$REPORT_LOG_TMP" "$REPORT_LOG"
+fi
+if [ ! -f "$REPORT_LOG" ]; then
+  echo "[submit] Quiet submission report was not generated: $REPORT_LOG" >&2
+  exit 1
+fi
 if [ "$test_rc" -ne 0 ]; then
   echo "[submit] NOTE: Tests reported failures (rc=$test_rc). See assignments/project/submission_report.log." >&2
 fi
@@ -61,9 +78,12 @@ fi
 set +e
 (
   cd "$ASSIGNMENTS_ROOT"
-  bash -lc "set -o pipefail; ./.testing/test_runner.sh -v project $PROJECT_PHASE > \"$REPORT_VERBOSE\""
+  bash -lc "set -o pipefail; ./.testing/test_runner.sh -v project $PROJECT_PHASE > \"$REPORT_VERBOSE_TMP\""
 )
 set -e
+if [ -f "$REPORT_VERBOSE_TMP" ]; then
+  mv -f "$REPORT_VERBOSE_TMP" "$REPORT_VERBOSE"
+fi
 
 echo "[submit] computing $PROJECT_PHASE summary..."
 python3 - <<'PY' "$ASSIGNMENT_DIR" "$SUMMARY_JSON" "$ASSIGNMENTS_ROOT/project/.wsrun_out/$PROJECT_PHASE/summary_all.jsonl" "$PROJECT_PHASE"
@@ -179,6 +199,7 @@ if phase == "phase_1":
 
 student_tests = read_set(student_root / "all_phase_2.list")
 baseline_dirs = ["inst_tests", "complex_demo1", "rand_simple", "rand_complex", "rand_ctrl", "rand_mem", "complex_demo2"]
+phase3_dirs = ["perf", "complex_demofinal", "rand_final", "rand_ldst", "rand_idcache", "rand_icache", "rand_dcache", "complex_demo1", "complex_demo2", "rand_complex", "rand_ctrl", "inst_tests"]
 baseline_tests: Set[str] = set()
 for d in baseline_dirs:
     baseline_tests |= read_set(public_root / d / "all.list")
@@ -193,6 +214,12 @@ elif phase == "phase_2_2":
     specialized_groups.add("complex_demo2_stall")
 elif phase == "phase_2_3":
     specialized_groups |= {"direct_perfbench", "direct_randbench", "associative_perfbench", "associative_randbench"}
+
+if phase == "phase_3":
+    student_tests = read_set(student_root / "all_phase_3.list")
+    baseline_tests = set()
+    for d in phase3_dirs:
+        baseline_tests |= read_set(public_root / d / "all.list")
 
 results: List[Dict] = []
 seen: Set[Tuple[str, str, str, str, str]] = set()

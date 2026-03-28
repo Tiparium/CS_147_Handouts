@@ -1,0 +1,15 @@
+{
+  "score": 0.0,
+  "visibility": "visible",
+  "stdout_visibility": "visible",
+  "autograder_messages": [],
+  "tests": [
+    {
+      "name": "project_phase_3",
+      "score": 0.0,
+      "max_score": 800.0,
+      "output": "Raw percent: 0.0\nAdjusted percent: 0.0/100\nFinal score: 0.0/800.0",
+      "visibility": "visible"
+    }
+  ]
+}

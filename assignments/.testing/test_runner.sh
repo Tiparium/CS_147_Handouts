@@ -585,6 +585,7 @@ run_project() {
   local tb=""
   local demo_dir=""
   local baseline_phase2_official_dirs=(inst_tests complex_demo1 rand_simple rand_complex rand_ctrl rand_mem complex_demo2)
+  local final_phase3_official_dirs=(perf complex_demofinal rand_final rand_ldst rand_idcache rand_icache rand_dcache complex_demo1 complex_demo2 rand_complex rand_ctrl inst_tests)
   local list_dirs=()
   local summary_jsonl=""
   local -a wsrun_flags=()
@@ -618,16 +619,16 @@ print(json.dumps({
 }, indent=2))
 PY
   }
-  phase2_family_student_custom_required() {
+  project_phase_student_custom_required() {
     case "$phase" in
-      phase_2|phase_2_1|phase_2_2|phase_2_3) return 0 ;;
+      phase_2|phase_2_1|phase_2_2|phase_2_3|phase_3) return 0 ;;
       *) return 1 ;;
     esac
   }
   phase23_after_student_custom() {
     [ "$phase23_prepend_cache" -eq 1 ] && [ "$1" = "student_custom" ]
   }
-  emit_phase2_student_custom_checkboxes() {
+  emit_project_student_custom_checkboxes() {
     local configured_count="${1:-0}"
     local passing_count="${2:-0}"
     local slot mark
@@ -717,8 +718,10 @@ PY
       phase23_prepend_cache=1
       ;;
     phase_3)
-      echo "[project] $phase tests are not wired yet."
-      return
+      tb="proc_hier_pbench"
+      demo_dir="$project_root/demo3/verilog"
+      list_dirs=(student_custom "${final_phase3_official_dirs[@]}")
+      wsrun_flags=(-pipe -align)
       ;;
     "")
       echo "Usage: ./run test project phase_1 [list|<test>] or ./run test project [phase]" >&2
@@ -781,6 +784,10 @@ PY
       echo "   - associative_perfbench"
       echo "   - associative_randbench"
       echo "4. Phase 2 baseline"
+    elif [ "$phase" = "phase_3" ]; then
+      echo "1. Student custom tests"
+      echo "   - student_custom"
+      echo "2. Final verification suite"
     fi
     if [ -f "$(list_file_for_dir "$custom_dir")" ]; then
       if [ "$phase" = "phase_2" ]; then
@@ -790,8 +797,22 @@ PY
     else
       if [ "$phase" = "phase_2" ]; then
         echo "1. Student custom tests (missing list)" >&2
+      elif [ "$phase" = "phase_3" ]; then
+        echo "1. Student custom tests (missing list)" >&2
       fi
       overall_status=1
+    fi
+
+    if [ "$phase" = "phase_3" ]; then
+      for d in "${final_phase3_official_dirs[@]}"; do
+        if [ -f "$(list_file_for_dir "$d")" ]; then
+          echo "   - $d"
+        else
+          echo "   - $d (missing list)" >&2
+          overall_status=1
+        fi
+      done
+      return
     fi
 
     if [ -f "$(list_file_for_dir "$simple_dir")" ]; then
@@ -941,14 +962,21 @@ PY
           complex_demo2_stall) group_label="Stalling memory tests" ;;
           inst_tests_unaligned) group_label="Unaligned access tests" ;;
           rand_simple|rand_complex|rand_ctrl|rand_mem) group_label="Random tests for demo1 ($d)" ;;
+          perf) group_label="Performance tests" ;;
+          complex_demofinal) group_label="Final complex tests" ;;
+          rand_final) group_label="Final random tests" ;;
+          rand_ldst) group_label="Random load/store tests" ;;
+          rand_idcache) group_label="Random instruction/data cache tests" ;;
+          rand_icache) group_label="Random instruction cache tests" ;;
+          rand_dcache) group_label="Random data cache tests" ;;
           student_custom) group_label="Student custom tests" ;;
           *) group_label="$d" ;;
         esac
         spinner_pause
         echo "[GROUP] $group_label"
         if [ ! -f "$list_file" ]; then
-          if [ "$d" = "student_custom" ] && phase2_family_student_custom_required; then
-            emit_phase2_student_custom_checkboxes 0 0
+          if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+            emit_project_student_custom_checkboxes 0 0
             echo ""
           fi
           if phase23_after_student_custom "$d"; then
@@ -969,8 +997,8 @@ PY
           spinner_resume
           continue
         fi
-        if [ "$group_count" -eq 0 ] && [ "$d" = "student_custom" ] && phase2_family_student_custom_required; then
-          emit_phase2_student_custom_checkboxes 0 0
+        if [ "$group_count" -eq 0 ] && [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
           echo ""
           if phase23_after_student_custom "$d"; then
             spinner_pause
@@ -1190,6 +1218,13 @@ PY
       complex_demo2_stall) group_label="Stalling memory tests" ;;
       inst_tests_unaligned) group_label="Unaligned access tests" ;;
       rand_simple|rand_complex|rand_ctrl|rand_mem) group_label="Random tests for demo1 ($d)" ;;
+      perf) group_label="Performance tests" ;;
+      complex_demofinal) group_label="Final complex tests" ;;
+      rand_final) group_label="Final random tests" ;;
+      rand_ldst) group_label="Random load/store tests" ;;
+      rand_idcache) group_label="Random instruction/data cache tests" ;;
+      rand_icache) group_label="Random instruction cache tests" ;;
+      rand_dcache) group_label="Random data cache tests" ;;
       student_custom) group_label="Student custom tests" ;;
       *) group_label="$d" ;;
     esac
@@ -1200,8 +1235,8 @@ PY
     fi
     if [ ! -f "$list_file" ]; then
       if [ "$internal" -eq 0 ]; then
-        if [ "$d" = "student_custom" ] && phase2_family_student_custom_required; then
-          emit_phase2_student_custom_checkboxes 0 0
+        if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
         fi
         echo ""
       fi
@@ -1213,8 +1248,8 @@ PY
     fi
     if [ "${group_count:-0}" -eq 0 ]; then
       if [ "$internal" -eq 0 ]; then
-        if [ "$d" = "student_custom" ] && phase2_family_student_custom_required; then
-          emit_phase2_student_custom_checkboxes 0 0
+        if [ "$d" = "student_custom" ] && project_phase_student_custom_required; then
+          emit_project_student_custom_checkboxes 0 0
         else
           echo "  [INFO] No tests configured."
         fi
@@ -1286,8 +1321,8 @@ PY
       student_fail=$((student_fail + g_fail))
       student_done_count=$((student_done_count + g_total))
       student_fail_count=$((student_fail_count + g_fail))
-      if [ "$internal" -eq 0 ] && phase2_family_student_custom_required; then
-        emit_phase2_student_custom_checkboxes "$g_total" "$g_pass"
+      if [ "$internal" -eq 0 ] && project_phase_student_custom_required; then
+        emit_project_student_custom_checkboxes "$g_total" "$g_pass"
       fi
       if phase23_after_student_custom "$d"; then
         PHASE23_CHAINED=1 run_project_phase2_cache "$phase" "$out_root"

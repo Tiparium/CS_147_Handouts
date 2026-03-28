@@ -1,0 +1,16 @@
+=== Grading Summary ===
+Total points: 800.00
+Raw percent : 0.00%
+Curved pct  : 0.00%
+Final score : 0.00 / 800.00
+autograder_messages=[]
+-----------------------
+Hash status: OK
+Scoring policy: Phase 3 full-suite count/remap
+Supplied tests: 0/100 passed
+Student custom requirement: 0/2 satisfied
+Raw counted passes: 0/102
+raw_score= 0.00
+curved_percent= 0.00
+final_score= 0.00
+timing_flag=no_curve

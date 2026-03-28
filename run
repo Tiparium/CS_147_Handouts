@@ -94,6 +94,7 @@ print_help() {
     ./run test project phase_2_2 [list|<test>] Run Phase 2.2 stalling-memory tests.
     ./run test project phase_2_3 [-direct|-associative] [-only] [subtest]
                                          Run Phase 2.3 cache-system tests.
+    ./run test project phase_3 [list|<test>] Run the full Phase 3 verification suite.
     ./run test project ... -justtimer  Simulate project test timing only (no tests executed).
     ./run build_submission <assignment|all> Run the assignment submission build flow (preferred).
     ./run build_submission project phase_1 Build project Phase 1 submission package.
@@ -101,6 +102,7 @@ print_help() {
     ./run build_submission project phase_2_1 Build Project Phase 2.1 submission package.
     ./run build_submission project phase_2_2 Build Project Phase 2.2 submission package.
     ./run build_submission project phase_2_3 Build Project Phase 2.3 submission package.
+    ./run build_submission project phase_3 Build Project Phase 3 submission package.
     ./run submit <assignment|all> Run the assignment submit flow (compat; same as build_submission).
     ./run verilog_checker <tgt>  Run Vcheck on an assignment or path (see scripts/verilog_checker/verilog_checker.sh for details).
     ./run wave_test              Generate VCD waveforms for the .testing mux examples.
@@ -995,6 +997,13 @@ case "${1:-}" in
             extra_make_args+=("$1")
           fi
           ;;
+        phase3|phase_3|3)
+          if [ "${assignment_arg:-}" = "project" ] && [ -z "$project_phase_arg" ]; then
+            project_phase_arg="phase_3"
+          else
+            extra_make_args+=("$1")
+          fi
+          ;;
         *) extra_make_args+=("$1") ;;
       esac
       shift
@@ -1102,6 +1111,7 @@ case "${1:-}" in
           phase_2_1) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_1/test_submissions/$zip_name" ;;
           phase_2_2) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_2/test_submissions/$zip_name" ;;
           phase_2_3) legacy_rel="assignments/project/demo2/Autograders/Gradescope_Autograder_Template_phase_2_3/test_submissions/$zip_name" ;;
+          phase_3) legacy_rel="assignments/project/demo3/Gradescope_Autograder_Template/test_submissions/$zip_name" ;;
           *) legacy_rel="assignments/project/demo1/Gradescope_Autograder_Template/test_submissions/$zip_name" ;;
         esac
       else
