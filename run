@@ -1059,11 +1059,43 @@ case "${1:-}" in
     else
       set -- "$assignment_arg"
     fi
-    # Run submit inside the container first.
-    docker run --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
+    # Run submit inside the container first. If the user interrupts the shell,
+    # explicitly terminate the Docker child so it does not continue detached.
+    submit_container_name="cs147-submit-$$_$(date +%s)"
+    submit_pid=""
+    submit_interrupted=0
+    cleanup_submit_container() {
+      local pid="${submit_pid:-}"
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill -TERM "$pid" 2>/dev/null || true
+        for _ in 1 2 3 4 5; do
+          kill -0 "$pid" 2>/dev/null || break
+          sleep 1
+        done
+        kill -KILL "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+      docker rm -f "$submit_container_name" >/dev/null 2>&1 || true
+    }
+    on_submit_interrupt() {
+      submit_interrupted=1
+      cleanup_submit_container
+    }
+    trap on_submit_interrupt INT TERM
+    trap cleanup_submit_container EXIT
+    docker run --name "$submit_container_name" --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
       -e HOST_REPO_ROOT="$REPO_ROOT" -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
-      -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@"
+      -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@" &
+    submit_pid=$!
+    set +e
+    wait "$submit_pid"
     rc=$?
+    set -e
+    submit_pid=""
+    trap - INT TERM EXIT
+    if [ "$submit_interrupted" = "1" ]; then
+      exit 130
+    fi
     if [ $rc -ne 0 ]; then
       exit $rc
     fi
