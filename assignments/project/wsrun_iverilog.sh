@@ -272,8 +272,42 @@ emit_record() {
   if [ "$spinner" -eq 1 ] && [ "$spinner_scope" = "run" ]; then
     spinner_pause
   fi
-  json_line="$(printf '{"test":"%s","status":"%s","errors_total":%d,"errors_total_display":"%s","errors_assemble":%d,"errors_compile":%d,"errors_sim":%d,"errors_sim_display":"%s","errors_diff":%d,"errors_diff_display":"%s","errors_vcheck":%d,"vcheck_status":"%s","diff_ran":%s}' \
-    "$test_name" "$status" "$err_total" "$err_total_display" "$err_assemble" "$err_compile" "$err_sim" "$err_sim_display" "$err_diff" "$err_diff_display" "$err_vcheck" "$vcheck_status" "$diff_ran_json")"
+  json_line="$(
+    python3 - <<'PY' \
+      "$test_name" "$status" "$err_total" "$err_total_display" \
+      "$err_assemble" "$err_compile" "$err_sim" "$err_sim_display" \
+      "$err_diff" "$err_diff_display" "$err_vcheck" "$vcheck_status" "$diff_ran_json"
+import json
+import os
+import sys
+
+obj = {
+    "test": sys.argv[1],
+    "status": sys.argv[2],
+    "errors_total": int(sys.argv[3]),
+    "errors_total_display": sys.argv[4],
+    "errors_assemble": int(sys.argv[5]),
+    "errors_compile": int(sys.argv[6]),
+    "errors_sim": int(sys.argv[7]),
+    "errors_sim_display": sys.argv[8],
+    "errors_diff": int(sys.argv[9]),
+    "errors_diff_display": sys.argv[10],
+    "errors_vcheck": int(sys.argv[11]),
+    "vcheck_status": sys.argv[12],
+    "diff_ran": sys.argv[13].lower() == "true",
+}
+for env_key, obj_key in (
+    ("WSRUN_CATEGORY", "category"),
+    ("WSRUN_GROUP_KEY", "group"),
+    ("WSRUN_GROUP_LABEL", "group_label"),
+    ("WSRUN_BUCKET", "bucket"),
+):
+    value = os.environ.get(env_key, "").strip()
+    if value:
+        obj[obj_key] = value
+print(json.dumps(obj, separators=(",", ":")))
+PY
+  )"
   printf "%s\n" "$json_line" >> "$summary_jsonl"
   case "$stream_mode" in
     json)

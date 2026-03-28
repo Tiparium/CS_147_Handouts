@@ -40,6 +40,8 @@ submit:
 	(cd "$(ASSIGNMENT_DIR)" && \
 	  if [ "$(ASSIGNMENT_NAME)" = "hw04" ]; then \
 	    files="$$(find . \( -type f -o -type l \) \( -name '*.v' -o -name '*.sv' -o -name '*.asm' -o -name '*.txt' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
+	  elif [ "$(ASSIGNMENT_NAME)" = "hw05" ]; then \
+	    files=""; \
 	  else \
 	    files="$$(find . \( -type f -o -type l \) \( -name '*.v' -o -name '*.sv' \) ! -name 'submission_report.log' ! -name 'submission_report_verbose.log' -print)"; \
 	  fi; \
@@ -62,6 +64,7 @@ submit:
 	if [ "${JUSTGRADE}" = "1" ]; then \
 	  zip_path="$(ASSIGNMENT_DIR)/grade_tmp_submission.zip"; \
 	  name="$${zip_path##*/}"; \
+	  marker_rel="assignments/$(ASSIGNMENT_NAME)/$${name}"; \
 	  echo "[submit] creating temp grader archive: $${name}"; \
 	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
 	else \
@@ -69,10 +72,10 @@ submit:
 	  i=1; while [ -e "$(SUBMISSION_DIR)/$(SUBMISSION_BASENAME)$${i}.zip" ]; do i=$$((i+1)); done; \
 	  name="$(SUBMISSION_BASENAME)$${i}.zip"; \
 	  zip_path="$(SUBMISSION_DIR)/$${name}"; \
+	  marker_rel="generated_turnins/$(ASSIGNMENT_NAME)/$${name}"; \
 	  echo "[submit] creating submission archive: $${name}"; \
 	  (cd "$(ASSIGNMENT_DIR)" && zip -rq "$${zip_path}" .); \
 	fi; \
-	marker_rel="$${zip_path#$(REPO_ROOT)/}"; \
 	echo "$${marker_rel}" > "$${marker}"; \
 	if [ -d "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions" ]; then \
 	  if cp "$${zip_path}" "$(ASSIGNMENT_DIR)/Gradescope_Autograder_Template/test_submissions/$${name}"; then \

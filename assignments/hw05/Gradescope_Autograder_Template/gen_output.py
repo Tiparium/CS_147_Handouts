@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import re
+from pathlib import Path
+from typing import Optional, Tuple
+
+# Per-assignment defaults (CLI flags override these).
+CONFIG = {
+    "assignment_name": "Programming Assignment",
+    # TODO: If HW5 ever moves from pass/fail to numeric scoring, set the
+    # assignment total and the per-problem split explicitly.
+    "total_points": 30.0,
+}
+
+
+def parse_scores(text: str) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    raw = curved = final = None
+
+    m_raw = re.search(r"raw_score\s*=\s*\[?\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m_raw:
+        raw = float(m_raw.group(1))
+
+    m_curved = re.search(r"curved_percent\s*=\s*\[?\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m_curved:
+        curved = float(m_curved.group(1))
+
+    m_final = re.search(r"final_score\s*=\s*\[?\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m_final:
+        final = float(m_final.group(1))
+
+    return raw, curved, final
+
+
+def parse_final_status(text: str) -> Optional[str]:
+    m = re.search(r"final_status\s*=\s*(PASS|FAIL)", text, re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    m2 = re.search(r"Final status\s*:\s*(PASS|FAIL)", text, re.IGNORECASE)
+    if m2:
+        return m2.group(1).upper()
+    return None
+
+
+def parse_autograder_messages(text: str) -> list[str]:
+    for line in text.splitlines():
+        if line.startswith("autograder_messages="):
+            payload = line.split("=", 1)[1].strip()
+            try:
+                parsed = json.loads(payload)
+            except json.JSONDecodeError:
+                return []
+            return parsed if isinstance(parsed, list) else []
+    return []
+
+
+def parse_total_points(text: str) -> Optional[float]:
+    m = re.search(r"Total points:\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m:
+        return float(m.group(1))
+    m2 = re.search(r"total_points\s*=\s*([0-9]+(?:\.[0-9]+)?)", text)
+    if m2:
+        return float(m2.group(1))
+    return None
+
+
+def parse_problem_tests(text: str) -> list[dict]:
+    tests: list[dict] = []
+    pattern = re.compile(
+        r"^\[TEST\]\s+(\S+)\s+(PASS|FAIL)\s+score=([0-9]+(?:\.[0-9]+)?)/([0-9]+(?:\.[0-9]+)?)\s*(.*)$"
+    )
+    for line in text.splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        name, status, score, max_score, output = match.groups()
+        tests.append(
+            {
+                "name": name,
+                "score": float(score),
+                "max_score": float(max_score),
+                "output": f"Status: {status}" + (f"\n{output}" if output else ""),
+                "visibility": "visible",
+            }
+        )
+    return tests
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--in", dest="in_path", required=True)
+    ap.add_argument("--out", dest="out_path", required=True)
+    ap.add_argument("--assignment-name", default=CONFIG.get("assignment_name", "Programming Assignment"))
+    ap.add_argument("--total-points", type=float, default=CONFIG.get("total_points", 100.0))
+    args = ap.parse_args()
+
+    in_path = Path(args.in_path)
+    out_path = Path(args.out_path)
+
+    text = in_path.read_text(errors="ignore") if in_path.is_file() else ""
+    raw, curved, final = parse_scores(text)
+    final_status = parse_final_status(text)
+    auto_msgs = parse_autograder_messages(text)
+    parsed_total = parse_total_points(text)
+    parsed_tests = parse_problem_tests(text)
+    total_points = float(parsed_total if parsed_total is not None else args.total_points)
+
+    if final_status is not None:
+        status_output = f"Final status: {final_status}\nHash check and required file/test checks were applied."
+        result = {
+            "score": 0.0,
+            "visibility": "visible",
+            "stdout_visibility": "visible",
+            "status": final_status,
+            "autograder_messages": auto_msgs,
+            "tests": [
+                {
+                    "name": args.assignment_name,
+                    "score": 0.0,
+                    "max_score": 0.0,
+                    "output": status_output,
+                    "visibility": "visible",
+                }
+            ],
+        }
+    else:
+        raw = raw if raw is not None else 0.0
+        curved = curved if curved is not None else raw
+        final_points = final if final is not None else (curved * total_points / 100.0)
+
+        # round finals for stable reporting
+        final_points = round(final_points, 2)
+        curved = round(curved, 2)
+
+        result = {
+            "score": float(final_points),
+            "visibility": "visible",
+            "stdout_visibility": "visible",
+            "autograder_messages": auto_msgs,
+            "tests": parsed_tests if parsed_tests else [
+                {
+                    "name": args.assignment_name,
+                    "score": float(final_points),
+                    "max_score": total_points,
+                    "output": (
+                        f"Raw percent: {raw}\n"
+                        f"Adjusted percent: {curved}/100\n"
+                        f"Final score: {final_points}/{total_points}"
+                    ),
+                    "visibility": "visible",
+                }
+            ],
+        }
+
+    out_path.write_text(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()
