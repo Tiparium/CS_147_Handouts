@@ -11,16 +11,16 @@ VERBOSE = os.environ.get("AG_VERBOSE", os.environ.get("VERBOSE", "0")) not in ("
 HASH_VERBOSE = os.environ.get("AG_HASH_VERBOSE", "0") not in ("0", "", "false", "False", None)
 
 CONFIG = {
-    # TODO: Replace these placeholder point values with the real HW5 split.
     "sub_points": {
-        "hw5_1": 0.0,
-        "hw5_2": 0.0,
+        "hw5_1": 35.0,
+        "hw5_2": 35.0,
     },
 }
 
 SUB_POINTS: Dict[str, float] = {k: float(v) for k, v in CONFIG["sub_points"].items()}
 EXPECTED_SUBPROBLEMS = tuple(SUB_POINTS.keys())
 TOTAL_POINTS = sum(SUB_POINTS.values())
+DISPLAY_TOTAL_POINTS = 0.0
 
 
 def parse_hash_block(report_path: Path) -> Tuple[Dict[str, str], List[str]]:
@@ -78,14 +78,12 @@ def parse_test_summary(lines: List[str]) -> Tuple[List[Dict], List[str]]:
             if sub_name not in SUB_POINTS:
                 continue
             seen.add(sub_name)
-            max_score = SUB_POINTS[sub_name]
-            score = max_score if status == "PASS" else 0.0
             tests.append(
                 {
                     "name": sub_name,
                     "status": status,
-                    "score": score,
-                    "max_score": max_score,
+                    "score": 0.0,
+                    "max_score": 0.0,
                     "output": detail,
                 }
             )
@@ -97,7 +95,7 @@ def parse_test_summary(lines: List[str]) -> Tuple[List[Dict], List[str]]:
                     "name": expected,
                     "status": "FAIL",
                     "score": 0.0,
-                    "max_score": SUB_POINTS[expected],
+                    "max_score": 0.0,
                     "output": "Missing summary line.",
                 }
             )
@@ -155,11 +153,11 @@ def main() -> int:
             test["score"] = 0.0
             test["output"] = f"{test.get('output', '')} Hash mismatch detected.".strip()
 
-    earned_points = sum(float(t.get("score", 0.0)) for t in tests)
-
     notes.insert(0, f"Hash status: {hash_status}")
-    notes.append(f"Total points: {TOTAL_POINTS}")
-    notes.append("TODO: Replace HW5 per-problem placeholder point values in grade.py.")
+    notes.append("Autograder mode: required-file reporting only.")
+    notes.append("Manual grading will assign the actual HW5 points.")
+    notes.append(f"Configured manual point split: hw5_1={SUB_POINTS['hw5_1']}, hw5_2={SUB_POINTS['hw5_2']}")
+    notes.append(f"Displayed total points: {DISPLAY_TOTAL_POINTS}")
     if VERBOSE or HASH_VERBOSE:
         notes.extend(hash_report("HASH REPORT (expected)", {"submission_report.log": expected_report_hash} if expected_report_hash else {}))
         notes.extend(hash_report("HASH REPORT (actual)", actual_hashes))
@@ -168,13 +166,13 @@ def main() -> int:
         notes.extend(verbose_path.read_text().splitlines())
 
     print("=== Grading Summary ===")
-    print("Assignment mode: per-problem independent scoring.")
-    print(f"Total points: {TOTAL_POINTS}")
-    print(f"earned_points= {earned_points}")
-    print(f"total_points= {TOTAL_POINTS}")
-    print(f"raw_score= {0.0 if TOTAL_POINTS <= 0 else (earned_points / TOTAL_POINTS) * 100.0}")
-    print(f"curved_percent= {0.0 if TOTAL_POINTS <= 0 else (earned_points / TOTAL_POINTS) * 100.0}")
-    print(f"final_score= {earned_points}")
+    print("Assignment mode: required-file reporting only (manual grading).")
+    print(f"Total points: {DISPLAY_TOTAL_POINTS}")
+    print("earned_points= 0.0")
+    print(f"total_points= {DISPLAY_TOTAL_POINTS}")
+    print("raw_score= 0.0")
+    print("curved_percent= 0.0")
+    print("final_score= 0.0")
     print("-----------------------")
     for note in notes:
         print(note)

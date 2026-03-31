@@ -1083,7 +1083,9 @@ case "${1:-}" in
     }
     trap on_submit_interrupt INT TERM
     trap cleanup_submit_container EXIT
-    docker run --name "$submit_container_name" --rm $DOCKER_PLATFORM_FLAG ${TTY_OPTS[@]+"${TTY_OPTS[@]}"} -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
+    # Submission runs are non-interactive and this process is backgrounded so
+    # forcing Docker TTY allocation can fail on some terminals (notably WSL).
+    docker run --name "$submit_container_name" --rm $DOCKER_PLATFORM_FLAG -v "$REPO_ROOT:/repo" ${SOCK_OPTS[@]+"${SOCK_OPTS[@]}"} -w /repo \
       -e HOST_REPO_ROOT="$REPO_ROOT" -e NOGRADE="$nograde" -e JUSTGRADE="$justgrade" -e AG_VERBOSE="$submit_verbose" -e AG_HASH_VERBOSE="$submit_hash_verbose" \
       -e MAKEFLAGS="--no-print-directory -s" "$IMAGE_NAME" make "$target" "$@" &
     submit_pid=$!
