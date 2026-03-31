@@ -8,9 +8,7 @@ from typing import Optional, Tuple
 # Per-assignment defaults (CLI flags override these).
 CONFIG = {
     "assignment_name": "Programming Assignment",
-    # TODO: If HW5 ever moves from pass/fail to numeric scoring, set the
-    # assignment total and the per-problem split explicitly.
-    "total_points": 30.0,
+    "total_points": 0.0,
 }
 
 
