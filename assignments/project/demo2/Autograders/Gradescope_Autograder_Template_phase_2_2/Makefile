@@ -23,7 +23,7 @@ submit:
 	next_padded=$$(printf "%02d" "$$next"); \
 	out="drafts/$$lab"_draft_"$$next_padded".zip; \
 	echo "Creating $$out"; \
-	zip -r "$$out" . -x "drafts/*" "docker/*" "test_submissions/*"
+	zip -r "$$out" . -x "drafts/*" "docker/*" "test_submissions/*" "local_results" "local_results/*" "__pycache__" "__pycache__/*"
 
 clean:
 	rm -rf local_results/*

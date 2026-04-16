@@ -26,6 +26,7 @@ TOTAL_POINTS = float(os.environ.get("TOTAL_POINTS", CONFIG.get("total_points", 1
 REQUIRED_STUDENT_TESTS = int(CONFIG.get("required_student_tests", 2))
 SUMMARY_NAME = str(CONFIG.get("summary_name", "project_phase_2_grade_summary.json"))
 MODE = str(CONFIG.get("mode", "count_remap"))
+EXTRA_CREDIT_SUPPLIED_TESTS = {"siic_0", "rti_0"}
 
 
 def clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
@@ -121,12 +122,50 @@ def ratio(passed: int, total: int) -> float:
     return float(passed) / float(total)
 
 
+def _summarize_tests(results: List[Dict]) -> Dict[str, int]:
+    total = len(results)
+    passed = sum(1 for r in results if str(r.get("status", "")).upper() == "PASS")
+    return {"tests": total, "passed": passed, "failed": total - passed}
+
+
+def scored_buckets(summary: Dict) -> Tuple[Dict, Dict, Dict, List[str]]:
+    buckets = summary.get("buckets", {})
+    student = dict(summary.get("student_custom", buckets.get("student_custom", {})))
+    baseline = dict(buckets.get("baseline", {}))
+    specialized = dict(buckets.get("specialized", {}))
+    tests_data = summary.get("tests", [])
+    excluded_extra_credit: List[str] = []
+
+    if not isinstance(tests_data, list) or not tests_data:
+        return student, baseline, specialized, excluded_extra_credit
+
+    counted = {"student_custom": [], "baseline": [], "specialized": []}
+    for test in tests_data:
+        if not isinstance(test, dict):
+            continue
+        name = str(test.get("test", "")).strip()
+        category = str(test.get("category", "")).strip()
+        bucket = str(test.get("bucket", "")).strip()
+        if category == "supplied" and name in EXTRA_CREDIT_SUPPLIED_TESTS:
+            excluded_extra_credit.append(name)
+            continue
+        if bucket in counted:
+            counted[bucket].append(test)
+
+    if any(counted.values()) or excluded_extra_credit:
+        student = _summarize_tests(counted["student_custom"])
+        student_required = int(summary.get("required_student_tests", REQUIRED_STUDENT_TESTS))
+        student["required"] = int(summary.get("student_custom", {}).get("required", student_required))
+        student["required_passing"] = min(student["required"], student["passed"])
+        baseline = _summarize_tests(counted["baseline"])
+        specialized = _summarize_tests(counted["specialized"])
+
+    return student, baseline, specialized, sorted(set(excluded_extra_credit))
+
+
 def compute_phase_scores(summary: Dict) -> Tuple[float, float, List[str]]:
     notes: List[str] = []
-    buckets = summary.get("buckets", {})
-    student = summary.get("student_custom", buckets.get("student_custom", {}))
-    baseline = buckets.get("baseline", {})
-    specialized = buckets.get("specialized", {})
+    student, baseline, specialized, excluded_extra_credit = scored_buckets(summary)
 
     student_total = int(student.get("tests", 0))
     student_pass = int(student.get("passed", 0))
@@ -139,6 +178,8 @@ def compute_phase_scores(summary: Dict) -> Tuple[float, float, List[str]]:
     specialized_pass = int(specialized.get("passed", 0))
 
     final_points = 0.0
+    if excluded_extra_credit:
+        notes.append(f"Excluded extra-credit supplied tests: {', '.join(excluded_extra_credit)}")
     if MODE == "count_remap":
         raw_total = baseline_total + student_required
         raw_earned = baseline_pass + student_required_pass
