@@ -129,7 +129,9 @@ module final_memory (
         if (wr1) begin
           mem[addr_1c<<1] = data_in_1c[15:8];       // The actual write
           mem[(addr_1c<<1)+1] = data_in_1c[7:0];
-          if ({1'b0, (addr_1c<<1)+1} > largest) largest = (addr_1c<<1)+1;  // avoid negative numbers
+          // CS147 handout compatibility: keep this explicit-width expression when merging.
+          // Icarus -g2012 rejects the old unsized (addr_1c<<1)+1 concatenation.
+          if (({1'b0, addr_1c, 1'b0} | 16'h0001) > largest) largest = ({1'b0, addr_1c, 1'b0} | 16'h0001);  // avoid negative numbers
         end
         if (create_dump) begin
           case (bank_id)

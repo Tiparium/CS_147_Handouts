@@ -141,6 +141,9 @@ def summarize_bucket(results: Iterable[Dict]) -> Dict[str, int]:
     return {"tests": total, "passed": passed, "failed": total - passed}
 
 
+EXTRA_CREDIT_SUPPLIED_TESTS = {"siic_0", "rti_0"}
+
+
 if phase == "phase_1":
     supplied_lists = ["inst_tests", "complex_demo1", "rand_simple", "rand_complex", "rand_ctrl", "rand_mem"]
     supplied_tests: Set[str] = set()
@@ -247,7 +250,9 @@ if summary_path.exists():
             category = "student_custom" if group == "student_custom" or name in student_tests else "supplied"
         if not group and category == "student_custom":
             group = "student_custom"
-        if not bucket:
+        if category == "supplied" and name in EXTRA_CREDIT_SUPPLIED_TESTS:
+            bucket = "excluded_extra_credit"
+        elif not bucket:
             if category == "student_custom" or name in student_tests:
                 bucket = "student_custom"
             elif group in specialized_groups or name in specialized_tests:
@@ -271,6 +276,7 @@ if summary_path.exists():
 student_results = [r for r in results if r["bucket"] == "student_custom"]
 specialized_results = [r for r in results if r["bucket"] == "specialized"]
 baseline_results = [r for r in results if r["bucket"] == "baseline"]
+excluded_extra_credit_results = [r for r in results if r["bucket"] == "excluded_extra_credit"]
 
 required_student_tests = 2
 student_bucket = summarize_bucket(student_results)
@@ -289,7 +295,9 @@ payload = {
         "student_custom": student_bucket,
         "specialized": specialized_bucket,
         "baseline": baseline_bucket,
+        "excluded_extra_credit": summarize_bucket(excluded_extra_credit_results),
     },
+    "excluded_extra_credit_tests": sorted({r["test"] for r in excluded_extra_credit_results}),
     "tests": results,
 }
 out_path.write_text(json.dumps(payload, indent=2))

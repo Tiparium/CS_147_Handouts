@@ -50,7 +50,7 @@ module mem_system_perfbench(/*AUTOARG*/);
    wire                 Stall_ref;
    wire                 CacheHit_ref;
    
-   mem_system_ref ref(
+   mem_system_ref ref_model(
                       // Outputs
                       .DataOut          (DataOut_ref[15:0]),
                       .Done             (Done_ref),

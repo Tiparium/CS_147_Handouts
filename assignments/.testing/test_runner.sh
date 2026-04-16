@@ -543,13 +543,27 @@ run_project_phase2_cache() {
     if [ -n "$addr_file" ]; then
       (
         cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
-        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" *.v >"$log_file" 2>&1 && \
+        cache_vfiles=()
+        for vf in *.v; do
+          case "$vf" in
+            *.syn.v) continue ;;
+          esac
+          cache_vfiles+=("$vf")
+        done
+        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" "${cache_vfiles[@]}" >"$log_file" 2>&1 && \
         vvp "$test_dir/simv" +addr_trace_file_name="$addr_file" >>"$log_file" 2>&1
       )
     else
       (
         cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
-        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" *.v >"$log_file" 2>&1 && \
+        cache_vfiles=()
+        for vf in *.v; do
+          case "$vf" in
+            *.syn.v) continue ;;
+          esac
+          cache_vfiles+=("$vf")
+        done
+        iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" "${cache_vfiles[@]}" >"$log_file" 2>&1 && \
         vvp "$test_dir/simv" >>"$log_file" 2>&1
       )
     fi
