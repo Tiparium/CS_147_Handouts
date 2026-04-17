@@ -89,7 +89,7 @@ module mem_system_perfbench(/*AUTOARG*/);
       
       if (!$value$plusargs("addr_trace_file_name=%s", addr_trace_file_name) ) begin
          $display("ERROR: FAIL no input file specified. Cannot proceed. Specify input using the -addr flag to wsrun.pl");
-         $stop;
+         $finish;
       end
       $display("Using trace file %s", addr_trace_file_name );
       fd = $fopen(addr_trace_file_name, "r");
@@ -199,7 +199,7 @@ module mem_system_perfbench(/*AUTOARG*/);
          end else begin
             $display("Test status: SUCCESS");
          end
-         $stop;
+         $finish;
       end
    endtask // end_simulation
    
