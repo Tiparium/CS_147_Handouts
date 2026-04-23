@@ -1,0 +1,93 @@
+\documentclass[11pt]{article}
+\usepackage{fullpage}
+\usepackage{enumitem}
+\usepackage{listings,amssymb}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{graphicx,xcolor}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+
+\lstset{numbers=left, numberstyle=\tiny}
+% TODO: Reconfirm HW5 assignment point total before publication.
+% Current split assumes the present 70-point Gradescope placeholder (35/35).
+
+\title{CS 147: Project Report \\ Due Date: May 8, 2026}
+\author{}
+\date{}
+
+\begin{document}
+\frenchspacing
+\maketitle
+
+\section*{Suggested Tools}
+\begin{enumerate}
+\item Use \LaTeX{} on \href{www.overleaf.com}{Overleaf}, which has IEEE template.
+\item Use tools for drawing state machines: \url{https://madebyevan.com/fsm/}.
+\end{enumerate}
+
+\section*{Writing Resources}
+\begin{enumerate}
+\item \href{http://research.microsoft.com/Users/simonpj/papers/giving-a-talk/giving-a-talk.htm}{How to write a good research paper}, Simon Peyton Jones.
+\item \href{http://www.cs.utexas.edu/~wcook/presentations/Writing.pdf}{Effective Writing}, William Cook's slides based on "Style: Toward Clarity and Grace".
+\item \href{http://www.cs.toronto.edu/~miller/Research/writing.html}{Computer Science Writing}
+\item World's most effective spell checker:
+\begin{verbatim}
+ispell -l < foo.tex | sort | uniq
+\end{verbatim}
+\end{enumerate}
+
+
+\section*{Report Submission}
+Project reports are encouraged to be submitted in \href{http://www.ieee.org/conferences_events/conferences/publishing/templates.html}{IEEE format}.
+Please upload a single PDF document to Gradescope.
+
+Here is a suggested layout for the final report.
+
+\section{Design Overview}
+\begin{itemize}
+\item[---] Less than a page describing overall what the project is about and what you did. Discuss each of the pipeline stages
+and cache design. Diagrams are not necessary.
+
+\item[---] 
+Design overview which should include your high-level processor schematics. Your design hierarchy must be clear.
+One high-level schematic that shows only the high-level pipeline is too little detail. Showing schematics for every
+MUX is too much. Use your discretion. All your material must be in one single PDF
+or .DOC file. (Maximum 3 pages)
+
+\item[---] (This part is optional. You will not lose points for skipping this. Nor will you get extra credit for including this.) A
+state diagram for any state machine controllers in your design. All other controllers should include a high-level
+textual description. (This also can be short, maximum 4 pages)
+\end{itemize}
+
+\section{Optimizations and Discussions}
+\begin{itemize}
+\item[---] Brief discussion of optimization implemented (Maximum 0.5 pages)
+\item[---] Discussion about failures, if any (Required for partial credit): A discussion of what does not work and why. Also
+include what you would have liked to implement given more time. For each part of the implementation that does not
+work, turn in an annotated output in the form of a trace or script run that clearly shows the error. Give your thoughts
+as to why the error occurs and what could be done to fix it. (without counting traces this section should not exceed
+half a page)
+\end{itemize}
+
+\section{Design Analysis}
+\begin{itemize}
+\item[---] A table listing the possible hazards that arise in your pipelined design and the number of stall cycles that each hazard
+incurs. (Maximum half a page)
+\item[---] A brief discussion of your cache design that explains the number of cycles for a cache-hit, cache-miss (with eviction
+of a line), cache-miss (without any eviction). (Maximum half a page)
+\end{itemize}
+
+\section{Conclusions and Final Thoughts}
+\begin{itemize}
+\item[---] A conclusion outlining what you learned by doing this project and what you would have done differently.
+(Maximum half a page)
+\item[---] What did you learn/change due to synthesis step?
+\end{itemize}
+
+\section{References}
+\begin{itemize}
+\item[---] Cite the sources you used for this project.
+\end{itemize}
+
+\end{document}
