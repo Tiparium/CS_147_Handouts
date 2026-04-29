@@ -1,0 +1,17 @@
+=== Grading Summary ===
+Total points: 267.00
+Raw percent : 43.82%
+Curved pct  : 43.82%
+Final score : 117.00 / 267.00
+autograder_messages=[]
+-----------------------
+Hash status: OK
+Excluded extra-credit supplied tests: siic_0
+Scoring policy: weighted buckets
+Baseline bucket: 372/372 -> 67.00/67.00
+Specialized bucket: 0/4 -> 0.00/150.00
+Student custom bucket: 2/2 -> 50.00/50.00
+raw_score= 43.82
+curved_percent= 43.82
+final_score= 117.00
+timing_flag=no_curve
