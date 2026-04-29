@@ -528,13 +528,19 @@ run_project_phase2_cache() {
   local supplied_total=0
   local supplied_pass=0
   local supplied_fail=0
-  local entry impl bench suite_dir tb_top addr_file test_name test_dir log_file status
+  local entry impl bench suite_dir tb_top addr_file addr_path demo_suite_dir runtime_src_dir test_name test_dir log_file status
   for entry in "${tests[@]}"; do
     IFS='|' read -r impl bench suite_dir tb_top addr_file <<<"$entry"
     test_name="${impl}_${bench}"
     test_dir="$out_root/$phase/$test_name"
     mkdir -p "$test_dir"
     log_file="$test_dir/run.log"
+    demo_suite_dir="$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir"
+    runtime_src_dir="$project_root/cache/$suite_dir/verilog"
+    addr_path=""
+    if [ -n "$addr_file" ]; then
+      addr_path="$project_root/cache/$suite_dir/verification/$addr_file"
+    fi
 
     echo "[GROUP] Phase 2.3 ${impl} cache"
     echo "  [RUN] $test_name"
@@ -542,7 +548,7 @@ run_project_phase2_cache() {
     set +e
     if [ -n "$addr_file" ]; then
       (
-        cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
+        cd "$demo_suite_dir" && \
         cache_vfiles=()
         for vf in *.v; do
           case "$vf" in
@@ -550,12 +556,15 @@ run_project_phase2_cache() {
           esac
           cache_vfiles+=("$vf")
         done
+        cp "$runtime_src_dir"/loadfile_all.img "$test_dir/" && \
+        cp "$runtime_src_dir"/loadfile_[0-3].img "$test_dir/" && \
         iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" "${cache_vfiles[@]}" >"$log_file" 2>&1 && \
-        vvp "$test_dir/simv" +addr_trace_file_name="$addr_file" >>"$log_file" 2>&1
+        cd "$test_dir" && \
+        vvp ./simv +addr_trace_file_name="$addr_path" >>"$log_file" 2>&1
       )
     else
       (
-        cd "$ASSIGN_ROOT/project/demo2/verilog/phase2_3/$suite_dir" && \
+        cd "$demo_suite_dir" && \
         cache_vfiles=()
         for vf in *.v; do
           case "$vf" in
@@ -563,8 +572,11 @@ run_project_phase2_cache() {
           esac
           cache_vfiles+=("$vf")
         done
+        cp "$runtime_src_dir"/loadfile_all.img "$test_dir/" && \
+        cp "$runtime_src_dir"/loadfile_[0-3].img "$test_dir/" && \
         iverilog -g2012 -s "$tb_top" -o "$test_dir/simv" "${cache_vfiles[@]}" >"$log_file" 2>&1 && \
-        vvp "$test_dir/simv" >>"$log_file" 2>&1
+        cd "$test_dir" && \
+        vvp ./simv >>"$log_file" 2>&1
       )
     fi
     rc=$?
